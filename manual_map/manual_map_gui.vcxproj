@@ -65,7 +65,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -82,12 +82,13 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\gui\main.cpp" />
     <ClCompile Include="src\gui\gui_app.cpp" />
+    <ClCompile Include="src\gui\gui_state.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
@@ -97,6 +98,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\gui\gui_app.hpp" />
+    <ClInclude Include="src\gui\gui_state.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="manual_map_core.vcxproj">

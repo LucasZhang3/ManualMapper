@@ -1,63 +1,130 @@
 #include <app/process_list.hpp>
 
 #include <windows.h>
-#include <winternl.h>
+#include <tlhelp32.h>
 
 #include <algorithm>
 
-#pragma comment( lib , "ntdll.lib" )
+namespace
+{
+    void query_runtime_details( process_entry& process )
+    {
+        if ( process.details_loaded || !process.pid )
+        {
+            return;
+        }
+
+        process.details_loaded = true;
+
+        HANDLE handle = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION , FALSE , process.pid );
+
+        if ( !handle )
+        {
+            return;
+        }
+
+        BOOL wow64 = FALSE;
+
+        if ( IsWow64Process( handle , &wow64 ) )
+        {
+            process.is_wow64 = wow64 == TRUE;
+        }
+
+        DWORD session = 0;
+
+        if ( ProcessIdToSessionId( process.pid , &session ) )
+        {
+            process.session_id = session;
+        }
+
+        HANDLE token = nullptr;
+
+        if ( OpenProcessToken( handle , TOKEN_QUERY , &token ) )
+        {
+            TOKEN_ELEVATION elevation {};
+            DWORD size = 0;
+
+            if ( GetTokenInformation( token , TokenElevation , &elevation , sizeof( elevation ) , &size ) )
+            {
+                process.is_elevated = elevation.TokenIsElevated != 0;
+            }
+
+            CloseHandle( token );
+        }
+
+        CloseHandle( handle );
+    }
+}
 
 std::vector< process_entry > list_processes( )
 {
     std::vector< process_entry > processes;
+    const HANDLE snapshot = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
 
-    ULONG size = 0;
-    NtQuerySystemInformation( SystemProcessInformation , nullptr , 0 , &size );
-
-    if ( !size )
+    if ( snapshot == INVALID_HANDLE_VALUE )
     {
         return processes;
     }
 
-    std::vector< uint8_t > buffer( size );
-    auto info = reinterpret_cast< SYSTEM_PROCESS_INFORMATION* >( buffer.data( ) );
+    PROCESSENTRY32W entry {};
+    entry.dwSize = sizeof( entry );
 
-    if ( !NT_SUCCESS( NtQuerySystemInformation( SystemProcessInformation , info , size , &size ) ) )
+    if ( Process32FirstW( snapshot , &entry ) )
     {
-        return processes;
-    }
-
-    while ( true )
-    {
-        if ( info->ImageName.Buffer && info->ImageName.Length > 0 )
+        do
         {
-            process_entry entry {};
-            entry.pid = static_cast< uint32_t >( reinterpret_cast< uint64_t >( info->UniqueProcessId ) );
-            entry.name.assign(
-                info->ImageName.Buffer ,
-                info->ImageName.Length / sizeof( wchar_t ) );
+            process_entry process {};
+            process.pid = entry.th32ProcessID;
+            process.parent_pid = entry.th32ParentProcessID;
+            process.name = entry.szExeFile;
 
-            if ( entry.pid && !entry.name.empty( ) )
+            if ( process.pid && !process.name.empty( ) )
             {
-                processes.push_back( std::move( entry ) );
+                processes.push_back( std::move( process ) );
             }
         }
-
-        if ( !info->NextEntryOffset )
-        {
-            break;
-        }
-
-        info = reinterpret_cast< SYSTEM_PROCESS_INFORMATION* >(
-            reinterpret_cast< uint8_t* >( info ) + info->NextEntryOffset );
+        while ( Process32NextW( snapshot , &entry ) );
     }
 
-    std::sort( processes.begin( ) , processes.end( ) , [ ] ( const process_entry& a , const process_entry& b )
-    {
-        return _wcsicmp( a.name.c_str( ) , b.name.c_str( ) ) < 0;
-    } );
-
+    CloseHandle( snapshot );
+    sort_processes( processes , process_sort_mode::name );
     return processes;
+}
+
+void enrich_process_details( process_entry& process )
+{
+    query_runtime_details( process );
+}
+
+void sort_processes( std::vector< process_entry >& processes , process_sort_mode mode )
+{
+    switch ( mode )
+    {
+    case process_sort_mode::pid:
+        std::sort( processes.begin( ) , processes.end( ) , [ ] ( const process_entry& a , const process_entry& b )
+        {
+            return a.pid < b.pid;
+        } );
+        break;
+    case process_sort_mode::session:
+        std::sort( processes.begin( ) , processes.end( ) , [ ] ( const process_entry& a , const process_entry& b )
+        {
+            if ( a.session_id != b.session_id )
+            {
+                return a.session_id < b.session_id;
+            }
+
+            return _wcsicmp( a.name.c_str( ) , b.name.c_str( ) ) < 0;
+        } );
+        break;
+    case process_sort_mode::name:
+    default:
+        std::sort( processes.begin( ) , processes.end( ) , [ ] ( const process_entry& a , const process_entry& b )
+        {
+            return _wcsicmp( a.name.c_str( ) , b.name.c_str( ) ) < 0;
+        } );
+        break;
+    }
 }
 
 std::vector< process_entry > find_processes_by_name( const wchar_t* name )
@@ -93,8 +160,11 @@ std::vector< process_entry > filter_processes( const std::vector< process_entry 
         std::transform( name.begin( ) , name.end( ) , name.begin( ) , towlower );
 
         const auto pid_text = std::to_wstring( process.pid );
+        const auto parent_text = std::to_wstring( process.parent_pid );
 
-        if ( name.find( needle ) != std::wstring::npos || pid_text.find( needle ) != std::wstring::npos )
+        if ( name.find( needle ) != std::wstring::npos
+            || pid_text.find( needle ) != std::wstring::npos
+            || parent_text.find( needle ) != std::wstring::npos )
         {
             filtered.push_back( process );
         }

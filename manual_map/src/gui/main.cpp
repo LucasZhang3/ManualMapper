@@ -1,8 +1,11 @@
 #include "gui_app.hpp"
 
-#include <imgui_impl_win32.h>
+#include <app/config.hpp>
 
 #include <windows.h>
+#include <shellapi.h>
+
+#include <imgui_impl_win32.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam );
 
@@ -24,6 +27,19 @@ namespace
             }
 
             return 0;
+        case WM_DROPFILES:
+        {
+            HDROP drop = reinterpret_cast< HDROP >( lparam );
+            wchar_t path [ MAX_PATH ] = {};
+
+            if ( DragQueryFileW( drop , 0 , path , MAX_PATH ) )
+            {
+                gui_app_set_dll_path( path );
+            }
+
+            DragFinish( drop );
+            return 0;
+        }
         case WM_SYSCOMMAND:
             if ( ( wparam & 0xfff0 ) == SC_KEYMENU )
             {
@@ -52,18 +68,28 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
     window_class.lpszClassName = L"ManualMapInjectorGui";
     RegisterClassExW( &window_class );
 
+    app_config config {};
+    load_config( config );
+
+    const int window_x = config.window_x >= 0 ? config.window_x : 100;
+    const int window_y = config.window_y >= 0 ? config.window_y : 100;
+    const int window_w = config.window_w > 0 ? config.window_w : 1280;
+    const int window_h = config.window_h > 0 ? config.window_h : 720;
+
     HWND hwnd = CreateWindowW(
         window_class.lpszClassName ,
         L"Manual Map Injector" ,
         WS_OVERLAPPEDWINDOW ,
-        100 ,
-        100 ,
-        1280 ,
-        720 ,
+        window_x ,
+        window_y ,
+        window_w ,
+        window_h ,
         nullptr ,
         nullptr ,
         instance ,
         nullptr );
+
+    DragAcceptFiles( hwnd , TRUE );
 
     if ( !gui_app_create_device( hwnd ) )
     {

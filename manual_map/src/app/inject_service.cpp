@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <algorithm>
 
 #pragma comment( lib , "comdlg32.lib" )
 
@@ -118,6 +119,12 @@ inject_result run_injection( inject_request request , app_config& config )
         return result;
     }
 
+    if ( request.delay_ms )
+    {
+        log_line( request , L"[inject] Delaying " + std::to_wstring( request.delay_ms ) + L" ms before injection." );
+        Sleep( request.delay_ms );
+    }
+
     auto payload = read_file_bytes( request.dll_path );
 
     if ( payload.empty( ) )
@@ -132,11 +139,31 @@ inject_result run_injection( inject_request request , app_config& config )
     manual_map_options options {};
     options.log = request.log;
 
+    auto inject_single_pid = [ & ] ( uint32_t pid , const std::wstring& label ) -> uint32_t
+    {
+        log_line( request , label );
+        return g_manual_map->inject_pid( pid , payload.data( ) , payload.size( ) , nullptr , 0 , options );
+    };
+
     if ( request.process_id )
     {
+        const auto processes = list_processes( );
+        const auto found = std::find_if( processes.begin( ) , processes.end( ) , [ & ] ( const process_entry& entry )
+        {
+            return entry.pid == request.process_id;
+        } );
+
+        if ( found != processes.end( ) && !is_process_allowed( config , found->name ) )
+        {
+            result.code = 0x1000;
+            log_line( request , L"Process blocked by safety rules: " + found->name );
+            return result;
+        }
+
         result.target_pid = request.process_id;
-        log_line( request , L"Using PID " + std::to_wstring( request.process_id ) + L"..." );
-        result.code = g_manual_map->inject_pid( request.process_id , payload.data( ) , payload.size( ) , nullptr , 0 , options );
+        result.code = inject_single_pid(
+            request.process_id ,
+            L"Using PID " + std::to_wstring( request.process_id ) + L"..." );
     }
     else
     {
@@ -144,6 +171,13 @@ inject_result run_injection( inject_request request , app_config& config )
         {
             result.code = 0x1000;
             log_line( request , L"Error: no process name or PID provided." );
+            return result;
+        }
+
+        if ( !is_process_allowed( config , request.process_name ) )
+        {
+            result.code = 0x1000;
+            log_line( request , L"Process blocked by safety rules: " + request.process_name );
             return result;
         }
 
@@ -160,9 +194,10 @@ inject_result run_injection( inject_request request , app_config& config )
                 return result;
             }
 
-            log_line( request , L"Found " + request.process_name + L" (PID " + std::to_wstring( pid ) + L")." );
             result.target_pid = pid;
-            result.code = g_manual_map->inject_pid( pid , payload.data( ) , payload.size( ) , nullptr , 0 , options );
+            result.code = inject_single_pid(
+                pid ,
+                L"Found " + request.process_name + L" (PID " + std::to_wstring( pid ) + L")." );
         }
         else
         {
@@ -175,14 +210,42 @@ inject_result run_injection( inject_request request , app_config& config )
                 return result;
             }
 
-            if ( matches.size( ) > 1 )
+            if ( request.inject_all && matches.size( ) > 1 )
             {
-                log_line( request , L"Warning: multiple instances found. Using PID " + std::to_wstring( matches.front( ).pid ) + L"." );
-            }
+                log_line( request , L"[inject] Injecting all " + std::to_wstring( matches.size( ) ) + L" matching instances." );
 
-            result.target_pid = matches.front( ).pid;
-            log_line( request , L"Target: " + request.process_name + L" (PID " + std::to_wstring( result.target_pid ) + L")" );
-            result.code = g_manual_map->inject( request.process_name.c_str( ) , payload.data( ) , payload.size( ) , nullptr , 0 , options );
+                for ( const auto& match : matches )
+                {
+                    const auto code = inject_single_pid(
+                        match.pid ,
+                        L"Target: " + request.process_name + L" (PID " + std::to_wstring( match.pid ) + L")" );
+
+                    if ( code == 0 )
+                    {
+                        ++result.success_count;
+                        result.target_pid = match.pid;
+                    }
+                    else if ( !result.code )
+                    {
+                        result.code = code;
+                        result.target_pid = match.pid;
+                    }
+                }
+
+                result.code = result.success_count > 0 ? 0u : result.code;
+            }
+            else
+            {
+                if ( matches.size( ) > 1 )
+                {
+                    log_line( request , L"Warning: multiple instances found. Using PID " + std::to_wstring( matches.front( ).pid ) + L"." );
+                }
+
+                result.target_pid = matches.front( ).pid;
+                result.code = inject_single_pid(
+                    matches.front( ).pid ,
+                    L"Target: " + request.process_name + L" (PID " + std::to_wstring( matches.front( ).pid ) + L")" );
+            }
         }
     }
 
@@ -190,7 +253,15 @@ inject_result run_injection( inject_request request , app_config& config )
     {
         remember_dll( config , request.dll_path );
         save_config( config );
-        log_line( request , L"Injection succeeded." );
+
+        if ( result.success_count > 1 )
+        {
+            log_line( request , L"Injection succeeded for " + std::to_wstring( result.success_count ) + L" processes." );
+        }
+        else
+        {
+            log_line( request , L"Injection succeeded." );
+        }
     }
     else
     {
