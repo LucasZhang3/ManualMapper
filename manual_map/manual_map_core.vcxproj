@@ -78,6 +78,7 @@
     <ClCompile Include="src\app\config.cpp" />
     <ClCompile Include="src\app\errors.cpp" />
     <ClCompile Include="src\app\inject_service.cpp" />
+    <ClCompile Include="src\app\payload_bridge.cpp" />
     <ClCompile Include="src\app\pe_util.cpp" />
     <ClCompile Include="src\app\process_list.cpp" />
     <ClCompile Include="src\manual_map\manual_map.cpp" />
@@ -92,7 +93,8 @@
     <ClInclude Include="include\app\errors.hpp" />
     <ClInclude Include="include\app\inject_service.hpp" />
     <ClInclude Include="include\app\pe_util.hpp" />
-    <ClInclude Include="include\app\process_list.hpp" />
+    <ClInclude Include="include\app\payload_bridge.hpp" />
+    <ClInclude Include="include\payload\payload_shared.hpp" />
     <ClInclude Include="include\core.hpp" />
     <ClInclude Include="include\manual_map\manual_map.hpp" />
   </ItemGroup>

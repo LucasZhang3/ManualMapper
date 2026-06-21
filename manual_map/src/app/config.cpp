@@ -255,6 +255,98 @@ namespace
         {
             config.settings_advanced_open = parse_bool( value , config.settings_advanced_open );
         }
+        else if ( key == L"settings_payload_open" )
+        {
+            config.settings_payload_open = parse_bool( value , config.settings_payload_open );
+        }
+        else if ( key == L"payload_enabled" )
+        {
+            config.payload_enabled = parse_bool( value , config.payload_enabled );
+        }
+        else if ( key == L"payload_silent" )
+        {
+            config.payload_silent = parse_bool( value , config.payload_silent );
+        }
+        else if ( key == L"payload_show_message" )
+        {
+            config.payload_show_message = parse_bool( value , config.payload_show_message );
+        }
+        else if ( key == L"payload_file_log" )
+        {
+            config.payload_file_log = parse_bool( value , config.payload_file_log );
+        }
+        else if ( key == L"payload_debug_log" )
+        {
+            config.payload_debug_log = parse_bool( value , config.payload_debug_log );
+        }
+        else if ( key == L"payload_attach_console" )
+        {
+            config.payload_attach_console = parse_bool( value , config.payload_attach_console );
+        }
+        else if ( key == L"payload_heartbeat" )
+        {
+            config.payload_heartbeat = parse_bool( value , config.payload_heartbeat );
+        }
+        else if ( key == L"payload_proof_file" )
+        {
+            config.payload_proof_file = parse_bool( value , config.payload_proof_file );
+        }
+        else if ( key == L"payload_module_watch" )
+        {
+            config.payload_module_watch = parse_bool( value , config.payload_module_watch );
+        }
+        else if ( key == L"payload_loadlib_hook" )
+        {
+            config.payload_loadlib_hook = parse_bool( value , config.payload_loadlib_hook );
+        }
+        else if ( key == L"payload_hotkeys" )
+        {
+            config.payload_hotkeys = parse_bool( value , config.payload_hotkeys );
+        }
+        else if ( key == L"payload_ipc_pipe" )
+        {
+            config.payload_ipc_pipe = parse_bool( value , config.payload_ipc_pipe );
+        }
+        else if ( key == L"payload_host_snapshot" )
+        {
+            config.payload_host_snapshot = parse_bool( value , config.payload_host_snapshot );
+        }
+        else if ( key == L"payload_plugin_loader" )
+        {
+            config.payload_plugin_loader = parse_bool( value , config.payload_plugin_loader );
+        }
+        else if ( key == L"payload_overlay" )
+        {
+            config.payload_overlay = parse_bool( value , config.payload_overlay );
+        }
+        else if ( key == L"payload_delay_ms" )
+        {
+            config.payload_delay_ms = parse_uint( value , config.payload_delay_ms );
+        }
+        else if ( key == L"payload_heartbeat_ms" )
+        {
+            config.payload_heartbeat_ms = parse_uint( value , config.payload_heartbeat_ms );
+        }
+        else if ( key == L"payload_snapshot_mode" )
+        {
+            config.payload_snapshot_mode = parse_uint( value , config.payload_snapshot_mode );
+        }
+        else if ( key == L"payload_ui_message" )
+        {
+            config.payload_ui_message = value;
+        }
+        else if ( key == L"payload_log_path" )
+        {
+            config.payload_log_path = value;
+        }
+        else if ( key == L"payload_proof_dir" )
+        {
+            config.payload_proof_dir = value;
+        }
+        else if ( key == L"payload_plugin_path" )
+        {
+            config.payload_plugin_path = value;
+        }
         else if ( key == L"history_target" )
         {
             config.injection_history.push_back( {} );
@@ -371,6 +463,29 @@ namespace
         file << L"settings_safety_open=" << ( config.settings_safety_open ? L"1" : L"0" ) << L"\n";
         file << L"settings_profiles_open=" << ( config.settings_profiles_open ? L"1" : L"0" ) << L"\n";
         file << L"settings_advanced_open=" << ( config.settings_advanced_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_payload_open=" << ( config.settings_payload_open ? L"1" : L"0" ) << L"\n";
+        file << L"payload_enabled=" << ( config.payload_enabled ? L"1" : L"0" ) << L"\n";
+        file << L"payload_silent=" << ( config.payload_silent ? L"1" : L"0" ) << L"\n";
+        file << L"payload_show_message=" << ( config.payload_show_message ? L"1" : L"0" ) << L"\n";
+        file << L"payload_file_log=" << ( config.payload_file_log ? L"1" : L"0" ) << L"\n";
+        file << L"payload_debug_log=" << ( config.payload_debug_log ? L"1" : L"0" ) << L"\n";
+        file << L"payload_attach_console=" << ( config.payload_attach_console ? L"1" : L"0" ) << L"\n";
+        file << L"payload_heartbeat=" << ( config.payload_heartbeat ? L"1" : L"0" ) << L"\n";
+        file << L"payload_proof_file=" << ( config.payload_proof_file ? L"1" : L"0" ) << L"\n";
+        file << L"payload_module_watch=" << ( config.payload_module_watch ? L"1" : L"0" ) << L"\n";
+        file << L"payload_loadlib_hook=" << ( config.payload_loadlib_hook ? L"1" : L"0" ) << L"\n";
+        file << L"payload_hotkeys=" << ( config.payload_hotkeys ? L"1" : L"0" ) << L"\n";
+        file << L"payload_ipc_pipe=" << ( config.payload_ipc_pipe ? L"1" : L"0" ) << L"\n";
+        file << L"payload_host_snapshot=" << ( config.payload_host_snapshot ? L"1" : L"0" ) << L"\n";
+        file << L"payload_plugin_loader=" << ( config.payload_plugin_loader ? L"1" : L"0" ) << L"\n";
+        file << L"payload_overlay=" << ( config.payload_overlay ? L"1" : L"0" ) << L"\n";
+        file << L"payload_delay_ms=" << config.payload_delay_ms << L"\n";
+        file << L"payload_heartbeat_ms=" << config.payload_heartbeat_ms << L"\n";
+        file << L"payload_snapshot_mode=" << config.payload_snapshot_mode << L"\n";
+        file << L"payload_ui_message=" << config.payload_ui_message << L"\n";
+        file << L"payload_log_path=" << config.payload_log_path << L"\n";
+        file << L"payload_proof_dir=" << config.payload_proof_dir << L"\n";
+        file << L"payload_plugin_path=" << config.payload_plugin_path << L"\n";
 
         for ( const auto& item : config.recent_dlls )
         {
@@ -511,4 +626,9 @@ void add_injection_history( app_config& config , const injection_history_entry& 
     {
         config.injection_history.resize( 20 );
     }
+}
+
+void clear_injection_history( app_config& config )
+{
+    config.injection_history.clear( );
 }

@@ -152,3 +152,114 @@ pe_info analyze_pe_file( const std::wstring& path )
 
     return info;
 }
+
+bool pe_has_export( const std::wstring& path , const char* export_name )
+{
+    if ( !export_name || !export_name [ 0 ] )
+    {
+        return false;
+    }
+
+    std::ifstream file( path , std::ios::binary | std::ios::ate );
+
+    if ( !file.is_open( ) )
+    {
+        return false;
+    }
+
+    const auto file_size = static_cast< size_t >( file.tellg( ) );
+    file.seekg( 0 , std::ios::beg );
+
+    std::vector< uint8_t > bytes( file_size );
+    file.read( reinterpret_cast< char* >( bytes.data( ) ) , static_cast< std::streamsize >( file_size ) );
+
+    if ( file_size < sizeof( IMAGE_DOS_HEADER ) )
+    {
+        return false;
+    }
+
+    const auto* dos = reinterpret_cast< const IMAGE_DOS_HEADER* >( bytes.data( ) );
+
+    if ( dos->e_magic != IMAGE_DOS_SIGNATURE )
+    {
+        return false;
+    }
+
+    if ( static_cast< size_t >( dos->e_lfanew ) + sizeof( IMAGE_NT_HEADERS64 ) > file_size )
+    {
+        return false;
+    }
+
+    const auto* nt = reinterpret_cast< const IMAGE_NT_HEADERS* >( bytes.data( ) + dos->e_lfanew );
+
+    if ( nt->Signature != IMAGE_NT_SIGNATURE )
+    {
+        return false;
+    }
+
+    const auto export_rva = nt->OptionalHeader.DataDirectory [ IMAGE_DIRECTORY_ENTRY_EXPORT ].VirtualAddress;
+
+    if ( !export_rva )
+    {
+        return false;
+    }
+
+    const auto rva_to_offset = [ & ] ( uint32_t rva ) -> size_t
+    {
+        const auto* first_section = IMAGE_FIRST_SECTION( nt );
+
+        for ( WORD idx = 0; idx < nt->FileHeader.NumberOfSections; ++idx )
+        {
+            const auto& section = first_section [ idx ];
+
+            if ( rva >= section.VirtualAddress && rva < section.VirtualAddress + section.Misc.VirtualSize )
+            {
+                return static_cast< size_t >( rva - section.VirtualAddress + section.PointerToRawData );
+            }
+        }
+
+        return SIZE_MAX;
+    };
+
+    const auto export_offset = rva_to_offset( export_rva );
+
+    if ( export_offset == SIZE_MAX || export_offset + sizeof( IMAGE_EXPORT_DIRECTORY ) > file_size )
+    {
+        return false;
+    }
+
+    const auto* exports = reinterpret_cast< const IMAGE_EXPORT_DIRECTORY* >( bytes.data( ) + export_offset );
+    const auto names_offset = rva_to_offset( exports->AddressOfNames );
+
+    if ( names_offset == SIZE_MAX )
+    {
+        return false;
+    }
+
+    for ( DWORD idx = 0; idx < exports->NumberOfNames; ++idx )
+    {
+        const auto name_rva_offset = names_offset + static_cast< size_t >( idx ) * sizeof( DWORD );
+
+        if ( name_rva_offset + sizeof( DWORD ) > file_size )
+        {
+            break;
+        }
+
+        const auto name_rva = *reinterpret_cast< const DWORD* >( bytes.data( ) + name_rva_offset );
+        const auto name_offset = rva_to_offset( name_rva );
+
+        if ( name_offset == SIZE_MAX || name_offset >= file_size )
+        {
+            continue;
+        }
+
+        const char* name = reinterpret_cast< const char* >( bytes.data( ) + name_offset );
+
+        if ( std::strcmp( name , export_name ) == 0 )
+        {
+            return true;
+        }
+    }
+
+    return false;
+}

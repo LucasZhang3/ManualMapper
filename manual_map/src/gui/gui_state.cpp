@@ -411,8 +411,12 @@ namespace
 
         if ( state.inject_result.code == 0 )
         {
-            state.status = "Injection succeeded";
-            append_log( state , "Injection succeeded." );
+            state.status = state.inject_result.payload_verified
+                ? "Injection succeeded (payload verified)"
+                : "Injection succeeded";
+            append_log( state , state.inject_result.payload_verified
+                ? "Injection succeeded. Payload handshake confirmed."
+                : "Injection succeeded." );
             gui_push_toast( state , "Injection succeeded" , toast_type::success );
         }
         else
@@ -1193,6 +1197,15 @@ namespace
     {
         ImGui::BeginChild( "HistoryPage" , ImVec2( -1.0f , ImGui::GetContentRegionAvail( ).y ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
         ImGui::TextUnformatted( "Injection History" );
+        ImGui::SameLine( ImGui::GetContentRegionAvail( ).x - 120.0f );
+
+        if ( gui_button( "Clear History" , ImVec2( 120.0f , 0.0f ) ) )
+        {
+            clear_injection_history( state.config );
+            save_config( state.config );
+            gui_push_toast( state , "Injection history cleared" , toast_type::info );
+        }
+
         ImGui::Separator( );
 
         if ( state.config.injection_history.empty( ) )
@@ -1250,7 +1263,13 @@ namespace
 
     void draw_settings_page( gui_app_state& state )
     {
-        ImGui::BeginChild( "SettingsScroll" , ImVec2( -1.0f , ImGui::GetContentRegionAvail( ).y ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        const auto& tokens = gui_theme_tokens_for( state );
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , tokens.section_spacing ) );
+        ImGui::BeginChild(
+            "SettingsScroll" ,
+            ImVec2( -1.0f , ImGui::GetContentRegionAvail( ).y ) ,
+            ImGuiChildFlags_AlwaysUseWindowPadding ,
+            gui_child_scroll_flags( ) );
 
         if ( gui_begin_section_card( "AppearanceSection" , "Appearance" , true , &state.config.settings_appearance_open ) )
         {
@@ -1470,6 +1489,78 @@ namespace
             gui_end_section_card( );
         }
 
+        if ( gui_begin_section_card( "PayloadSection" , "Payload DLL" , true , &state.config.settings_payload_open ) )
+        {
+            if ( ImGui::Checkbox( "Enable payload protocol" , &state.config.payload_enabled ) )
+            {
+                save_config( state.config );
+            }
+
+            ImGui::Checkbox( "Silent (no message box)" , &state.config.payload_silent );
+            ImGui::Checkbox( "Show message box on attach" , &state.config.payload_show_message );
+            ImGui::Checkbox( "File logging" , &state.config.payload_file_log );
+            ImGui::Checkbox( "Debug output logging" , &state.config.payload_debug_log );
+            ImGui::Checkbox( "Attach console" , &state.config.payload_attach_console );
+            ImGui::Checkbox( "Heartbeat thread" , &state.config.payload_heartbeat );
+            ImGui::Checkbox( "Write proof file" , &state.config.payload_proof_file );
+            ImGui::Checkbox( "Module watcher" , &state.config.payload_module_watch );
+            ImGui::Checkbox( "LoadLibrary hook" , &state.config.payload_loadlib_hook );
+            ImGui::Checkbox( "Hotkeys (F8 overlay, F9 snapshot, F10 unload)" , &state.config.payload_hotkeys );
+            ImGui::Checkbox( "Named pipe IPC" , &state.config.payload_ipc_pipe );
+            ImGui::Checkbox( "Host snapshot on attach" , &state.config.payload_host_snapshot );
+            ImGui::Checkbox( "Plugin loader" , &state.config.payload_plugin_loader );
+            ImGui::Checkbox( "Topmost overlay window" , &state.config.payload_overlay );
+
+            ImGui::SetNextItemWidth( 120.0f );
+            int delay_ms = static_cast< int >( state.config.payload_delay_ms );
+            int heartbeat_ms = static_cast< int >( state.config.payload_heartbeat_ms );
+
+            if ( ImGui::InputInt( "Delayed init (ms)" , &delay_ms ) )
+            {
+                state.config.payload_delay_ms = delay_ms < 0 ? 0u : static_cast< uint32_t >( delay_ms );
+            }
+
+            if ( ImGui::InputInt( "Heartbeat interval (ms)" , &heartbeat_ms ) )
+            {
+                state.config.payload_heartbeat_ms = heartbeat_ms < 0 ? 0u : static_cast< uint32_t >( heartbeat_ms );
+            }
+
+            static char plugin_path [ 512 ] = {};
+            static char log_path [ 512 ] = {};
+            static char proof_dir [ 512 ] = {};
+            static char ui_message [ 256 ] = {};
+            static bool payload_fields_init = false;
+
+            if ( !payload_fields_init )
+            {
+                std::strncpy( plugin_path , wide_to_utf8( state.config.payload_plugin_path ).c_str( ) , sizeof( plugin_path ) - 1 );
+                std::strncpy( log_path , wide_to_utf8( state.config.payload_log_path ).c_str( ) , sizeof( log_path ) - 1 );
+                std::strncpy( proof_dir , wide_to_utf8( state.config.payload_proof_dir ).c_str( ) , sizeof( proof_dir ) - 1 );
+                std::strncpy( ui_message , wide_to_utf8( state.config.payload_ui_message ).c_str( ) , sizeof( ui_message ) - 1 );
+                payload_fields_init = true;
+            }
+
+            ImGui::InputText( "Plugin DLL path" , plugin_path , sizeof( plugin_path ) );
+            ImGui::InputText( "Log file path (optional)" , log_path , sizeof( log_path ) );
+            ImGui::InputText( "Proof/snapshot directory (optional)" , proof_dir , sizeof( proof_dir ) );
+            ImGui::InputText( "Attach message" , ui_message , sizeof( ui_message ) );
+
+            if ( gui_button( "Save payload settings" ) )
+            {
+                state.config.payload_plugin_path = utf8_to_wide( plugin_path );
+                state.config.payload_log_path = utf8_to_wide( log_path );
+                state.config.payload_proof_dir = utf8_to_wide( proof_dir );
+                state.config.payload_ui_message = utf8_to_wide( ui_message );
+                save_config( state.config );
+                gui_push_toast( state , "Payload settings saved" , toast_type::success );
+            }
+
+            ImGui::TextDisabled( "Hotkeys: F8 toggle overlay, F9 snapshot, F10 request unload." );
+            ImGui::TextDisabled( "Exports: PayloadGetVersion, PayloadGetStatus, PayloadRequestUnload." );
+
+            gui_end_section_card( );
+        }
+
         if ( gui_begin_section_card( "AboutSection" , "About" , true , nullptr ) )
         {
             ImGui::TextUnformatted( "Manual Map Injector v2.0" );
@@ -1479,6 +1570,7 @@ namespace
         }
 
         ImGui::EndChild( );
+        ImGui::PopStyleVar( );
     }
 
     bool export_log( gui_app_state& state )

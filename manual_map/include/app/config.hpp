@@ -1,5 +1,7 @@
 #pragma once
 
+#include <payload/payload_shared.hpp>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -59,6 +61,31 @@ struct app_config
     bool settings_safety_open = true;
     bool settings_profiles_open = true;
     bool settings_advanced_open = true;
+
+    bool payload_enabled = true;
+    bool payload_silent = false;
+    bool payload_show_message = true;
+    bool payload_file_log = true;
+    bool payload_debug_log = true;
+    bool payload_attach_console = false;
+    bool payload_heartbeat = true;
+    bool payload_proof_file = true;
+    bool payload_module_watch = true;
+    bool payload_loadlib_hook = true;
+    bool payload_hotkeys = true;
+    bool payload_ipc_pipe = true;
+    bool payload_host_snapshot = true;
+    bool payload_plugin_loader = false;
+    bool payload_overlay = true;
+    uint32_t payload_feature_flags = PAYLOAD_FEATURE_DEFAULT;
+    uint32_t payload_delay_ms = 0;
+    uint32_t payload_heartbeat_ms = 1000;
+    uint32_t payload_snapshot_mode = PAYLOAD_SNAPSHOT_ALL;
+    std::wstring payload_ui_message;
+    std::wstring payload_log_path;
+    std::wstring payload_proof_dir;
+    std::wstring payload_plugin_path;
+    bool settings_payload_open = true;
 };
 
 bool load_config( app_config& config );
@@ -70,3 +97,4 @@ void remember_dll( app_config& config , const std::wstring& dll_path );
 void remove_recent_dll( app_config& config , const std::wstring& dll_path );
 bool is_process_allowed( const app_config& config , const std::wstring& process_name );
 void add_injection_history( app_config& config , const injection_history_entry& entry );
+void clear_injection_history( app_config& config );

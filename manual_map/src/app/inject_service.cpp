@@ -1,6 +1,7 @@
 #include <app/inject_service.hpp>
 
 #include <app/errors.hpp>
+#include <app/payload_bridge.hpp>
 #include <app/process_list.hpp>
 #include <manual_map/manual_map.hpp>
 
@@ -142,7 +143,38 @@ inject_result run_injection( inject_request request , app_config& config )
     auto inject_single_pid = [ & ] ( uint32_t pid , const std::wstring& label ) -> uint32_t
     {
         log_line( request , label );
-        return g_manual_map->inject_pid( pid , payload.data( ) , payload.size( ) , nullptr , 0 , options );
+
+        payload_inject_session session = prepare_payload_session( pid , config , request );
+        void* reserved = nullptr;
+        size_t reserved_size = 0;
+
+        if ( session.payload_enabled )
+        {
+            reserved = &session.config;
+            reserved_size = sizeof( payload_config );
+            log_line( request , L"[payload] Passing configuration block to payload DLL." );
+        }
+
+        const uint32_t code = g_manual_map->inject_pid(
+            pid ,
+            payload.data( ) ,
+            payload.size( ) ,
+            reserved ,
+            reserved_size ,
+            options );
+
+        if ( code == 0 && session.payload_enabled )
+        {
+            result.payload_verified = verify_payload_handshake( session , 8000 , request.log );
+
+            if ( result.payload_verified && ( config.payload_ipc_pipe ) )
+            {
+                send_payload_ipc_command( session , PAYLOAD_IPC_PING , request.log );
+            }
+        }
+
+        cleanup_payload_session( session );
+        return code;
     };
 
     if ( request.process_id )

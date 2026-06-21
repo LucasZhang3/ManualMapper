@@ -159,39 +159,48 @@ bool gui_begin_section_card( const char* id , const char* title , bool default_o
 
     ImGui::PushStyleVar( ImGuiStyleVar_ChildRounding , 6.0f );
     ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( inner_pad , inner_pad ) );
-    ImGui::PushStyleColor( ImGuiCol_ChildBg , ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
+    ImGui::PushStyleColor( ImGuiCol_ChildBg , ImGui::GetStyleColorVec4( ImGuiCol_PopupBg ) );
+    ImGui::PushStyleColor( ImGuiCol_Border , ImGui::GetStyleColorVec4( ImGuiCol_Separator ) );
     ImGui::BeginChild(
         id ,
         ImVec2( -1.0f , 0.0f ) ,
-        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize ,
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AlwaysUseWindowPadding ,
         gui_child_scroll_flags( ) );
 
     if ( open_state )
     {
+        ImGui::PushStyleColor( ImGuiCol_Text , ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) );
+        ImGui::PushStyleColor( ImGuiCol_Header , ImVec4( 0.0f , 0.0f , 0.0f , 0.0f ) );
+        ImGui::PushStyleColor( ImGuiCol_HeaderHovered , ImGui::GetStyleColorVec4( ImGuiCol_HeaderHovered ) );
+        ImGui::PushStyleColor( ImGuiCol_HeaderActive , ImGui::GetStyleColorVec4( ImGuiCol_HeaderActive ) );
         const bool open = ImGui::CollapsingHeader( title , open_state ? ImGuiTreeNodeFlags_None : ImGuiTreeNodeFlags_DefaultOpen );
+        ImGui::PopStyleColor( 4 );
 
         if ( !open )
         {
             ImGui::EndChild( );
-            ImGui::PopStyleColor( );
+            ImGui::PopStyleColor( 2 );
             ImGui::PopStyleVar( 2 );
             return false;
         }
+
+        ImGui::Separator( );
+        ImGui::Spacing( );
     }
     else
     {
-        ImGui::TextUnformatted( title );
+        ImGui::TextDisabled( "%s" , title );
         ImGui::Separator( );
+        ImGui::Spacing( );
     }
 
-    ImGui::Spacing( );
     return true;
 }
 
 void gui_end_section_card( )
 {
     ImGui::EndChild( );
-    ImGui::PopStyleColor( );
+    ImGui::PopStyleColor( 2 );
     ImGui::PopStyleVar( 2 );
     ImGui::Spacing( );
 }

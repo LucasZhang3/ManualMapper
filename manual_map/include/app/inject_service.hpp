@@ -21,6 +21,7 @@ struct inject_result
     uint32_t code = 0;
     uint32_t target_pid = 0;
     uint32_t success_count = 0;
+    bool payload_verified = false;
 };
 
 inject_result run_injection( inject_request request , app_config& config );

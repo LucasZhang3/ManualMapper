@@ -15,3 +15,4 @@ struct pe_info
 };
 
 pe_info analyze_pe_file( const std::wstring& path );
+bool pe_has_export( const std::wstring& path , const char* export_name );

@@ -300,29 +300,31 @@ namespace
         }
 
         const bool elevated = is_process_elevated( );
-        const auto& tokens = gui_theme_tokens_for( state );
         const float content_width = ImGui::GetContentRegionAvail( ).x;
-        const float right_gutter = tokens.shell_padding * 0.5f;
         const float item_gap = 24.0f;
-        ImGui::AlignTextToFramePadding( );
+        const float text_h = ImGui::GetTextLineHeight( );
+        const float region_min_y = ImGui::GetWindowContentRegionMin( ).y;
+        const float region_max_y = ImGui::GetWindowContentRegionMax( ).y;
+        const float centered_y = region_min_y + ( region_max_y - region_min_y - text_h ) * 0.5f;
+        ImGui::SetCursorPosY( centered_y );
         ImGui::TextUnformatted( state.status.c_str( ) );
         ImGui::SameLine( 0.0f , item_gap );
         ImGui::TextDisabled( "%s" , target.c_str( ) );
 
         const char* privilege_label = elevated ? "Admin" : "Standard";
         const ImVec2 privilege_size = ImGui::CalcTextSize( privilege_label );
-        ImGui::SameLine( content_width - privilege_size.x - right_gutter );
+        ImGui::SameLine( content_width - privilege_size.x );
         ImGui::TextColored(
             elevated ? gui_theme_accent( ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ,
             "%s" ,
             privilege_label );
     }
 
-    void begin_shell_child( const char* id , const ImVec2& pos , const ImVec2& size , const ImVec4& bg )
+    void begin_shell_child( const char* id , const ImVec2& pos , const ImVec2& size , const ImVec4& bg , ImGuiChildFlags child_flags = ImGuiChildFlags_None )
     {
         ImGui::SetCursorPos( pos );
         ImGui::PushStyleColor( ImGuiCol_ChildBg , bg );
-        ImGui::BeginChild( id , size , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        ImGui::BeginChild( id , size , child_flags , gui_child_scroll_flags( ) );
     }
 
     void end_shell_child( )
@@ -442,8 +444,13 @@ void gui_shell_render(
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + 32.0f , 6.0f ) );
-    begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad , 0.0f ) );
+    begin_shell_child(
+        "##shell_status" ,
+        ImVec2( 0.0f , display.y - status_h ) ,
+        ImVec2( display.x , status_h ) ,
+        status_bg ,
+        ImGuiChildFlags_AlwaysUseWindowPadding );
     draw_status_bar_content( state );
     end_shell_child( );
     ImGui::PopStyleVar( );

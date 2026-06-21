@@ -36,7 +36,7 @@ const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state )
     g_tokens.mono_size = state.config.compact_mode ? 14.0f : 16.0f;
     g_tokens.title_bar_height = state.config.compact_mode ? 34.0f : 38.0f;
     g_tokens.tab_bar_height = state.config.compact_mode ? 34.0f : 38.0f;
-    g_tokens.status_bar_height = state.config.compact_mode ? 26.0f : 28.0f;
+    g_tokens.status_bar_height = state.config.compact_mode ? 28.0f : 32.0f;
     g_tokens.row_height = state.config.compact_mode ? 40.0f : 44.0f;
     g_tokens.shell_padding = state.config.compact_mode ? 12.0f : 16.0f;
     g_tokens.card_padding = state.config.compact_mode ? 10.0f : 12.0f;
