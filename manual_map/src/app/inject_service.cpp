@@ -188,7 +188,6 @@ inject_result run_injection( inject_request request , app_config& config )
 
     if ( result.code == 0 )
     {
-        remember_process( config , request.process_name.empty( ) ? std::to_wstring( result.target_pid ) : request.process_name );
         remember_dll( config , request.dll_path );
         save_config( config );
         log_line( request , L"Injection succeeded." );

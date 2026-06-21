@@ -94,17 +94,9 @@ bool load_config( app_config& config )
         trim( key );
         trim( value );
 
-        if ( key == L"last_process" )
-        {
-            config.last_process = value;
-        }
-        else if ( key == L"last_dll" )
+        if ( key == L"last_dll" )
         {
             config.last_dll = value;
-        }
-        else if ( key == L"recent_process" )
-        {
-            push_recent( config.recent_processes , value , 8 );
         }
         else if ( key == L"recent_dll" )
         {
@@ -124,13 +116,7 @@ void save_config( const app_config& config )
         return;
     }
 
-    file << L"last_process=" << config.last_process << L"\n";
     file << L"last_dll=" << config.last_dll << L"\n";
-
-    for ( const auto& item : config.recent_processes )
-    {
-        file << L"recent_process=" << item << L"\n";
-    }
 
     for ( const auto& item : config.recent_dlls )
     {
@@ -138,14 +124,23 @@ void save_config( const app_config& config )
     }
 }
 
-void remember_process( app_config& config , const std::wstring& process )
-{
-    config.last_process = process;
-    push_recent( config.recent_processes , process , 8 );
-}
-
 void remember_dll( app_config& config , const std::wstring& dll_path )
 {
     config.last_dll = dll_path;
     push_recent( config.recent_dlls , dll_path , 8 );
+}
+
+void remove_recent_dll( app_config& config , const std::wstring& dll_path )
+{
+    config.recent_dlls.erase(
+        std::remove_if( config.recent_dlls.begin( ) , config.recent_dlls.end( ) , [ & ] ( const std::wstring& item )
+        {
+            return _wcsicmp( item.c_str( ) , dll_path.c_str( ) ) == 0;
+        } ) ,
+        config.recent_dlls.end( ) );
+
+    if ( _wcsicmp( config.last_dll.c_str( ) , dll_path.c_str( ) ) == 0 )
+    {
+        config.last_dll.clear( );
+    }
 }

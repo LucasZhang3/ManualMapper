@@ -6,17 +6,24 @@ param(
 
     [switch] $Push ,
 
+    [switch] $StageAll ,
+
     [string] $Author = "Lucas Zhang <lucaszhang1118@gmail.com>"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$GitExe = "C:\Program Files\Git\bin\git.exe"
+if ( -not ( Test-Path -LiteralPath $GitExe ) ) {
+    $GitExe = "git"
+}
+
 function Invoke-Git {
-    param( [Parameter( ValueFromRemainingArguments = $true )] [string[]] $Args )
-    & git @Args
+    param( [Parameter( ValueFromRemainingArguments = $true )] [string[]] $GitArgs )
+    & $GitExe @GitArgs
     if ( $LASTEXITCODE -ne 0 ) {
-        throw "git $($Args -join ' ') failed with exit code $LASTEXITCODE"
+        throw "git $($GitArgs -join ' ') failed with exit code $LASTEXITCODE"
     }
 }
 
@@ -24,27 +31,31 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $repoRoot
 
 try {
-    $staged = git diff --cached --quiet 2>$null
+    if ( $StageAll ) {
+        Invoke-Git add -A
+    }
+
+    $null = & $GitExe diff --cached --quiet 2>$null
     $hasStaged = $LASTEXITCODE -ne 0
 
     if ( -not $hasStaged ) {
-        $untracked = git ls-files --others --exclude-standard
+        $untracked = & $GitExe ls-files --others --exclude-standard
         if ( -not $untracked ) {
             Write-Host "Nothing to commit."
             exit 0
         }
 
-        Write-Host "No staged changes. Stage everything with: git add -A"
+        Write-Host "No staged changes. Re-run with -StageAll or run: git add -A"
         exit 1
     }
 
-    $tree = ( git write-tree ).Trim()
+    $tree = ( & $GitExe write-tree ).Trim()
     if ( -not $tree ) {
         throw "git write-tree returned empty tree"
     }
 
     $parents = @()
-    $head = git rev-parse --verify HEAD 2>$null
+    $head = & $GitExe rev-parse --verify HEAD 2>$null
     if ( $LASTEXITCODE -eq 0 -and $head ) {
         $parents = @( "-p" , $head.Trim() )
     }
@@ -73,13 +84,8 @@ try {
     $env:GIT_COMMITTER_EMAIL = $authorEmail
 
     try {
-        $commitArgs = @(
-            "commit-tree" , $tree
-        ) + $parents + @(
-            "-m" , $fullMessage
-        )
-
-        $commit = ( git @commitArgs ).Trim()
+        $commitArgs = @( "commit-tree" , $tree ) + $parents + @( "-m" , $fullMessage )
+        $commit = ( & $GitExe @commitArgs ).Trim()
     }
     finally {
         $env:GIT_AUTHOR_NAME = $previousAuthorName
@@ -92,7 +98,7 @@ try {
         throw "git commit-tree failed"
     }
 
-    $branch = ( git rev-parse --abbrev-ref HEAD ).Trim()
+    $branch = ( & $GitExe rev-parse --abbrev-ref HEAD ).Trim()
     if ( $branch -eq "HEAD" ) {
         throw "Detached HEAD - checkout a branch before committing."
     }
@@ -100,7 +106,7 @@ try {
     Invoke-Git update-ref "refs/heads/$branch" $commit
 
     Write-Host "Created commit $commit on $branch"
-    git log -1 --format=fuller
+    & $GitExe log -1 --format=fuller
 
     if ( $Push ) {
         Invoke-Git push origin $branch

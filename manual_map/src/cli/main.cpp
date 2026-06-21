@@ -160,7 +160,6 @@ int wmain( int argc , wchar_t* argv [ ] )
 
     inject_request request {};
     request.dll_path = config.last_dll;
-    request.process_name = config.last_process;
     request.log = [ ] ( const std::wstring& line )
     {
         std::wcout << line << L'\n';
