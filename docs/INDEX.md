@@ -17,7 +17,7 @@ This index maps every doc to source files, typical workflows, and cross-links so
 | [CLI reference](cli-reference.md) | `manual_map.exe` flags, interactive mode, exit codes, automation | `manual_map/src/cli/main.cpp` |
 | [Configuration reference](configuration-reference.md) | `settings.ini` keys, profiles, history, safety rules, load/save API | `manual_map/src/app/config.cpp`, `config.hpp` |
 | [Build and deployment](build-and-deployment.md) | Visual Studio, MSBuild, outputs, scripts, elevation, troubleshooting | `manual_map.sln`, `scripts/` |
-| [Screenshot placeholders](images/PLACEHOLDER.md) | PNG assets under `docs/images/` (01-13 provided, 14-16 optional) | `docs/images/` |
+| Screenshots | PNG assets under `docs/images/` (01-13 in repo, 14-16 optional) | `docs/images/` |
 
 ---
 
@@ -115,7 +115,7 @@ Details: [Architecture - Runtime data flow](architecture.md), [Manual map engine
 
 ## Screenshots
 
-Visual references live under `docs/images/`. Files **01** through **13** are included in the repo. Files **14** through **16** are optional and documented with text and diagrams instead of PNGs. See [images/PLACEHOLDER.md](images/PLACEHOLDER.md).
+Visual references live under `docs/images/`. Files **01** through **13** are included in the repo. Files **14** through **16** are optional and documented with text and diagrams in [GUI application](gui-application.md) and [CLI reference](cli-reference.md).
 
 | Image | Doc references |
 |-------|----------------|
@@ -151,4 +151,4 @@ Visual references live under `docs/images/`. Files **01** through **13** are inc
 ## Related reading outside this folder
 
 - [main README](../README.md) - installation, first inject, disclaimer
-- ImGui vendor docs under `manual_map/third_party/imgui/docs/` (upstream only, not application behavior)
+- ImGui core is vendored at `manual_map/third_party/imgui/` (Win32 + DX11 backends only; see `LICENSE.txt`)

@@ -144,7 +144,6 @@ bin\Release\x64\payload_dll.dll
 |--------|---------|
 | `commit.ps1` | Stage, commit with fixed author metadata, optional push |
 | `ensure-gui-not-running.ps1` | Stop GUI process before build to avoid LNK1104 |
-| `reset-history.bat` | Batch helper for history reset (if present in repo) |
 
 Example commit from repo root:
 
@@ -201,7 +200,7 @@ If targets miss VC++ runtime on clean VMs, install [Microsoft Visual C++ Redistr
 2. Copy `bin\Release\x64\` trio: `manual_map_gui.exe`, `manual_map.exe`, `payload_dll.dll`.
 3. Ensure VC++ runtime available if dynamically linked.
 4. Run GUI elevated when testing system processes.
-5. Optional screenshots: see [images/PLACEHOLDER.md](images/PLACEHOLDER.md) (01-13 provided).
+5. Screenshots live in `docs/images/` (01-13). Optional captures 14-16 are documented in [GUI application](gui-application.md) and [CLI reference](cli-reference.md) without bundled PNGs.
 
 ---
 
