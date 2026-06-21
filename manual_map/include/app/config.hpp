@@ -33,7 +33,7 @@ struct app_config
     int window_h = 720;
     float panel_split = 0.42f;
 
-    bool confirm_inject = true;
+    bool confirm_inject = false;
     bool log_timestamps = true;
     bool use_allowlist = false;
     bool stealth_capture = false;

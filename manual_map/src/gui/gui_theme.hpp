@@ -22,6 +22,7 @@ struct gui_theme_tokens
 
 void gui_theme_init( gui_app_state& state );
 void gui_theme_apply( gui_app_state& state );
+void gui_theme_apply_accent_colors( gui_app_state& state );
 const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state );
 ImVec4 gui_theme_accent( int accent_index );
 ImVec4 gui_theme_accent_muted( int accent_index , bool light_mode );

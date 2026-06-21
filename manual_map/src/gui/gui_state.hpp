@@ -52,11 +52,9 @@ struct gui_app_state
     bool wait_for_process = false;
     bool inject_all = false;
     bool auto_inject = false;
-    bool confirm_inject = true;
     bool log_timestamps = true;
     bool use_allowlist = false;
     bool show_settings = false;
-    bool show_confirm_popup = false;
     bool light_mode = false;
     bool stealth_capture = false;
     bool show_process_tree = false;
@@ -66,6 +64,7 @@ struct gui_app_state
     std::unordered_map< ImGuiID , float > pill_anim;
     bool command_palette_open = false;
     bool log_follow_tail = true;
+    bool log_scroll_to_bottom = false;
     bool show_wizard = false;
     bool focus_search_next_frame = false;
     bool focus_log_filter_next_frame = false;

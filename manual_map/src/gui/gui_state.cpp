@@ -388,12 +388,6 @@ namespace
 
     void start_injection( gui_app_state& state )
     {
-        if ( state.confirm_inject )
-        {
-            state.show_confirm_popup = true;
-            return;
-        }
-
         launch_injection( state );
     }
 
@@ -937,6 +931,14 @@ namespace
             }
         }
 
+        ImGui::SameLine( );
+
+        if ( gui_button( "Jump to bottom" ) )
+        {
+            state.log_follow_tail = true;
+            state.log_scroll_to_bottom = true;
+        }
+
         std::string log_copy;
         {
             std::lock_guard lock( state.log_mutex );
@@ -978,17 +980,13 @@ namespace
         {
             ImGui::SetScrollHereY( 1.0f );
         }
-        else if ( !state.log_follow_tail && ImGui::GetScrollMaxY( ) > 0.0f )
+
+        if ( state.log_scroll_to_bottom )
         {
-            ImGui::SetCursorScreenPos( ImVec2( ImGui::GetWindowPos( ).x + ImGui::GetWindowWidth( ) - 120.0f , ImGui::GetWindowPos( ).y + 8.0f ) );
-
-            if ( gui_small_button( "Jump to bottom" ) )
-            {
-                state.log_follow_tail = true;
-            }
+            ImGui::SetScrollY( ImGui::GetScrollMaxY( ) );
+            state.log_scroll_to_bottom = false;
         }
-
-        if ( ImGui::GetScrollY( ) < ImGui::GetScrollMaxY( ) - 4.0f && was_at_bottom == false )
+        else if ( ImGui::GetScrollY( ) < ImGui::GetScrollMaxY( ) - 4.0f )
         {
             state.log_follow_tail = false;
         }
@@ -1054,7 +1052,7 @@ namespace
                 refresh_processes( state );
             }
 
-            if ( gui_draw_pill_toggle( state , "tree_toggle" , &state.show_process_tree , "Tree" , "Flat" , "Group processes by parent PID with indent." ) )
+            if ( gui_draw_bool_options( state , "tree_toggle" , &state.show_process_tree , "Flat" , "Tree" , "Group processes by parent PID with indent." ) )
             {
                 state.config.show_process_tree = state.show_process_tree;
                 save_config( state.config );
@@ -1253,7 +1251,7 @@ namespace
 
         if ( gui_begin_section_card( "AppearanceSection" , "Appearance" , true , &state.config.settings_appearance_open ) )
         {
-            if ( gui_draw_pill_toggle( state , "theme_toggle" , &state.light_mode , "Light" , "Dark" , "Switch between light and dark interface themes." ) )
+            if ( gui_draw_bool_options( state , "theme_toggle" , &state.light_mode , "Dark" , "Light" , "Switch between light and dark interface themes." ) )
             {
                 state.config.light_mode = state.light_mode;
                 gui_theme_apply( state );
@@ -1270,7 +1268,7 @@ namespace
                 if ( ImGui::Button( "##accent" , ImVec2( 28.0f , 28.0f ) ) )
                 {
                     state.config.accent_index = idx;
-                    gui_theme_apply( state );
+                    gui_theme_apply_accent_colors( state );
                     save_config( state.config );
                 }
 
@@ -1278,7 +1276,13 @@ namespace
 
                 if ( state.config.accent_index == idx )
                 {
-                    ImGui::GetWindowDrawList( )->AddRect( ImGui::GetItemRectMin( ) , ImGui::GetItemRectMax( ) , IM_COL32( 255 , 255 , 255 , 255 ) , 4.0f );
+                    ImGui::GetWindowDrawList( )->AddRect(
+                        ImGui::GetItemRectMin( ) ,
+                        ImGui::GetItemRectMax( ) ,
+                        ImGui::GetColorU32( ImVec4( 1.0f , 1.0f , 1.0f , state.light_mode ? 0.85f : 1.0f ) ) ,
+                        4.0f ,
+                        0 ,
+                        2.0f );
                 }
 
                 ImGui::SameLine( );
@@ -1287,13 +1291,13 @@ namespace
 
             ImGui::NewLine( );
 
-            if ( gui_draw_pill_toggle( state , "compact_toggle" , &state.config.compact_mode , "Compact" , "Comfortable" , "Tighter spacing and smaller fonts." ) )
+            if ( gui_draw_bool_options( state , "compact_toggle" , &state.config.compact_mode , "Comfortable" , "Compact" , "Tighter spacing and smaller fonts." ) )
             {
                 gui_theme_init( state );
                 save_config( state.config );
             }
 
-            if ( gui_draw_pill_toggle( state , "tray_toggle" , &state.config.min_to_tray , "Min to tray" , "Minimize normally" , "Minimize button sends app to system tray." ) )
+            if ( gui_draw_bool_options( state , "tray_toggle" , &state.config.min_to_tray , "Minimize normally" , "Min to tray" , "Minimize button sends app to system tray." ) )
             {
                 save_config( state.config );
             }
@@ -1310,7 +1314,7 @@ namespace
                 ImGui::BeginDisabled( );
             }
 
-            if ( gui_draw_pill_toggle( state , "stealth_toggle" , &state.stealth_capture , "Stealth" , "Visible" , "Capture visibility for Discord/OBS." ) )
+            if ( gui_draw_bool_options( state , "stealth_toggle" , &state.stealth_capture , "Visible" , "Stealth" , "Capture visibility for Discord/OBS." ) )
             {
                 if ( !set_stealth_capture( state , state.stealth_capture ) )
                 {
@@ -1328,15 +1332,9 @@ namespace
 
         if ( gui_begin_section_card( "InjectionSection" , "Injection" , true , &state.config.settings_injection_open ) )
         {
-            if ( ImGui::Checkbox( "Confirm before inject" , &state.confirm_inject ) )
-            {
-                state.config.confirm_inject = state.confirm_inject;
-                save_config( state.config );
-            }
-
-            ImGui::Checkbox( "Wait up to 30 seconds for process" , &state.wait_for_process );
-            ImGui::Checkbox( "Inject all matching instances" , &state.inject_all );
-            ImGui::Checkbox( "Auto-inject when process appears" , &state.auto_inject );
+            gui_draw_toggle_chip( state , "wait_toggle" , &state.wait_for_process , "Wait up to 30 seconds for process" );
+            gui_draw_toggle_chip( state , "inject_all_toggle" , &state.inject_all , "Inject all matching instances" );
+            gui_draw_toggle_chip( state , "auto_inject_toggle" , &state.auto_inject , "Auto-inject when process appears" );
             ImGui::SetNextItemWidth( 120.0f );
             ImGui::InputInt( "Delay before inject (seconds)" , &state.inject_delay_sec );
             state.inject_delay_sec = ( std::max )( 0 , state.inject_delay_sec );
@@ -1355,7 +1353,7 @@ namespace
 
         if ( gui_begin_section_card( "LoggingSection" , "Logging" , true , &state.config.settings_logging_open ) )
         {
-            if ( ImGui::Checkbox( "Log timestamps" , &state.log_timestamps ) )
+            if ( gui_draw_toggle_chip( state , "timestamps_toggle" , &state.log_timestamps , "Log timestamps" ) )
             {
                 state.config.log_timestamps = state.log_timestamps;
                 save_config( state.config );
@@ -1366,7 +1364,7 @@ namespace
 
         if ( gui_begin_section_card( "SafetySection" , "Safety" , true , &state.config.settings_safety_open ) )
         {
-            if ( ImGui::Checkbox( "Allowlist mode (off = blocklist)" , &state.use_allowlist ) )
+            if ( gui_draw_toggle_chip( state , "allowlist_toggle" , &state.use_allowlist , "Allowlist mode (off = blocklist)" ) )
             {
                 state.config.use_allowlist = state.use_allowlist;
                 save_config( state.config );
@@ -1543,45 +1541,6 @@ namespace
         append_log( state , "Log exported to " + wide_to_utf8( path ) );
         return true;
     }
-
-    void draw_confirm_popup( gui_app_state& state )
-    {
-        if ( state.show_confirm_popup )
-        {
-            ImGui::OpenPopup( "Confirm Injection" );
-            state.show_confirm_popup = false;
-        }
-
-        if ( ImGui::BeginPopupModal( "Confirm Injection" , nullptr , ImGuiWindowFlags_AlwaysAutoResize ) )
-        {
-            ImGui::TextUnformatted( "Proceed with manual map injection?" );
-            ImGui::Text( "DLL: %s" , state.dll_path );
-
-            if ( state.selected_pid > 0 )
-            {
-                ImGui::Text( "Target PID: %d" , state.selected_pid );
-            }
-            else
-            {
-                ImGui::Text( "Target name: %s" , state.search );
-            }
-
-            if ( gui_button( "Inject" , ImVec2( 120.0f , 0.0f ) ) )
-            {
-                launch_injection( state );
-                ImGui::CloseCurrentPopup( );
-            }
-
-            ImGui::SameLine( );
-
-            if ( gui_button( "Cancel" , ImVec2( 120.0f , 0.0f ) ) )
-            {
-                ImGui::CloseCurrentPopup( );
-            }
-
-            ImGui::EndPopup( );
-        }
-    }
 }
 
 void gui_state_init( gui_app_state& state )
@@ -1589,7 +1548,6 @@ void gui_state_init( gui_app_state& state )
     g_state = &state;
     load_config( state.config );
 
-    state.confirm_inject = state.config.confirm_inject;
     state.log_timestamps = state.config.log_timestamps;
     state.use_allowlist = state.config.use_allowlist;
     state.panel_split = state.config.panel_split;
@@ -1760,6 +1718,7 @@ void gui_state_save_window( gui_app_state& state , void* hwnd )
 void gui_state_render( gui_app_state& state )
 {
     ImGuiIO& io = ImGui::GetIO( );
+    gui_theme_apply_accent_colors( state );
 
     gui_shell_render(
         state ,
@@ -1782,7 +1741,6 @@ void gui_state_render( gui_app_state& state )
         } ,
         [ & ]()
         {
-            draw_confirm_popup( state );
             gui_draw_command_palette( state );
             gui_draw_first_run_wizard( state );
             gui_draw_toasts( state );

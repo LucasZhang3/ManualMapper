@@ -236,9 +236,9 @@ namespace
             }
             else
             {
-                ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
-                ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.12f : 0.18f ) );
-                ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.18f : 0.24f ) );
+                ImGui::PushStyleColor( ImGuiCol_Button , ImGui::GetStyleColorVec4( ImGuiCol_FrameBg ) );
+                ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgHovered ) );
+                ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgActive ) );
             }
 
             if ( ImGui::Button( item.label , ImVec2( 0.0f , tab_h ) ) )
@@ -303,9 +303,10 @@ namespace
         const auto& tokens = gui_theme_tokens_for( state );
         const float content_width = ImGui::GetContentRegionAvail( ).x;
         const float right_gutter = tokens.shell_padding * 0.5f;
+        const float item_gap = 24.0f;
         ImGui::AlignTextToFramePadding( );
         ImGui::TextUnformatted( state.status.c_str( ) );
-        ImGui::SameLine( content_width * 0.34f );
+        ImGui::SameLine( 0.0f , item_gap );
         ImGui::TextDisabled( "%s" , target.c_str( ) );
 
         const char* privilege_label = elevated ? "Admin" : "Standard";
@@ -441,7 +442,7 @@ void gui_shell_render(
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + tokens.card_padding , 6.0f ) );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + tokens.card_padding + 8.0f , 8.0f ) );
     begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
     draw_status_bar_content( state );
     end_shell_child( );

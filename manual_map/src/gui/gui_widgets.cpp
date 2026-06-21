@@ -14,6 +14,7 @@
 #include <shellapi.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 extern void* g_gui_hwnd;
@@ -209,6 +210,98 @@ bool gui_small_button( const char* label )
     return pressed;
 }
 
+bool gui_draw_bool_options( gui_app_state& state , const char* id , bool* value , const char* false_label , const char* true_label , const char* tooltip )
+{
+    ImGui::PushID( id );
+    bool changed = false;
+    const char* labels [ 2 ] = { false_label , true_label };
+
+    for ( int option = 0; option < 2; ++option )
+    {
+        const bool selected = ( *value ) == ( option == 1 );
+
+        if ( option > 0 )
+        {
+            ImGui::SameLine( );
+        }
+
+        if ( selected )
+        {
+            ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
+            ImGui::PushStyleColor( ImGuiCol_ButtonHovered , gui_theme_accent( state.config.accent_index ) );
+            ImGui::PushStyleColor( ImGuiCol_ButtonActive , gui_theme_accent( state.config.accent_index ) );
+            ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( state.light_mode ) );
+        }
+        else
+        {
+            ImGui::PushStyleColor( ImGuiCol_Button , ImGui::GetStyleColorVec4( ImGuiCol_FrameBg ) );
+            ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgHovered ) );
+            ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgActive ) );
+            ImGui::PushStyleColor( ImGuiCol_Text , ImGui::GetStyleColorVec4( ImGuiCol_Text ) );
+        }
+
+        if ( ImGui::Button( labels [ option ] , ImVec2( 0.0f , 0.0f ) ) )
+        {
+            *value = option == 1;
+            changed = true;
+        }
+
+        if ( selected )
+        {
+            ImGui::GetWindowDrawList( )->AddRect(
+                ImGui::GetItemRectMin( ) ,
+                ImGui::GetItemRectMax( ) ,
+                ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) ,
+                ImGui::GetStyle( ).FrameRounding ,
+                0 ,
+                2.0f );
+        }
+
+        ImGui::PopStyleColor( 4 );
+    }
+
+    if ( tooltip )
+    {
+        gui_draw_help_marker( tooltip );
+    }
+
+    ImGui::PopID( );
+    return changed;
+}
+
+bool gui_draw_toggle_chip( gui_app_state& state , const char* id , bool* value , const char* label )
+{
+    ImGui::PushID( id );
+
+    if ( *value )
+    {
+        ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , gui_theme_accent( state.config.accent_index ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive , gui_theme_accent( state.config.accent_index ) );
+        ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( state.light_mode ) );
+    }
+    else
+    {
+        ImGui::PushStyleColor( ImGuiCol_Button , ImGui::GetStyleColorVec4( ImGuiCol_FrameBg ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgHovered ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgActive ) );
+        ImGui::PushStyleColor( ImGuiCol_Text , ImGui::GetStyleColorVec4( ImGuiCol_Text ) );
+    }
+
+    char button_label [ 192 ] = {};
+    std::snprintf( button_label , sizeof( button_label ) , "%s  %s" , *value ? "[x]" : "[ ]" , label );
+    const bool pressed = ImGui::Button( button_label , ImVec2( -1.0f , 0.0f ) );
+
+    if ( pressed )
+    {
+        *value = !*value;
+    }
+
+    ImGui::PopStyleColor( 4 );
+    ImGui::PopID( );
+    return pressed;
+}
+
 bool gui_begin_section_card( const char* id , const char* title , bool default_open , bool* open_state , float padding_scale )
 {
     const gui_app_state* app_state = gui_app_state_ptr( );
@@ -226,11 +319,7 @@ bool gui_begin_section_card( const char* id , const char* title , bool default_o
 
     if ( open_state )
     {
-        ImGui::PushStyleColor( ImGuiCol_Header , ImVec4( 0 , 0 , 0 , 0 ) );
-        ImGui::PushStyleColor( ImGuiCol_HeaderHovered , ImVec4( 1 , 1 , 1 , 0.04f ) );
-        ImGui::PushStyleColor( ImGuiCol_HeaderActive , ImVec4( 1 , 1 , 1 , 0.06f ) );
         const bool open = ImGui::CollapsingHeader( title , open_state ? ImGuiTreeNodeFlags_None : ImGuiTreeNodeFlags_DefaultOpen );
-        ImGui::PopStyleColor( 3 );
 
         if ( !open )
         {

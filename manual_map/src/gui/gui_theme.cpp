@@ -52,6 +52,41 @@ const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state )
     return g_tokens;
 }
 
+void gui_theme_apply_accent_colors( gui_app_state& state )
+{
+    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+    ImVec4* style_colors = ImGui::GetStyle( ).Colors;
+
+    style_colors [ ImGuiCol_Header ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.22f : 0.35f );
+    style_colors [ ImGuiCol_HeaderHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.32f : 0.50f );
+    style_colors [ ImGuiCol_HeaderActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.42f : 0.65f );
+    style_colors [ ImGuiCol_Button ] = ImVec4( accent.x , accent.y , accent.z , 1.0f );
+    style_colors [ ImGuiCol_ButtonHovered ] = ImVec4(
+        ( std::min )( accent.x * 1.08f , 1.0f ) ,
+        ( std::min )( accent.y * 1.08f , 1.0f ) ,
+        ( std::min )( accent.z * 1.08f , 1.0f ) ,
+        1.0f );
+    style_colors [ ImGuiCol_ButtonActive ] = ImVec4( accent.x * 0.88f , accent.y * 0.88f , accent.z * 0.88f , 1.0f );
+    style_colors [ ImGuiCol_CheckMark ] = accent;
+    style_colors [ ImGuiCol_SliderGrab ] = accent;
+    style_colors [ ImGuiCol_SliderGrabActive ] = ImVec4( accent.x * 0.9f , accent.y * 0.9f , accent.z * 0.9f , 1.0f );
+    style_colors [ ImGuiCol_ScrollbarGrab ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.55f : 0.65f );
+    style_colors [ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( accent.x , accent.y , accent.z , 0.85f );
+    style_colors [ ImGuiCol_ScrollbarGrabActive ] = accent;
+    style_colors [ ImGuiCol_TextSelectedBg ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.28f : 0.40f );
+    style_colors [ ImGuiCol_NavHighlight ] = ImVec4( accent.x , accent.y , accent.z , 0.70f );
+    style_colors [ ImGuiCol_SeparatorHovered ] = ImVec4( accent.x , accent.y , accent.z , 0.55f );
+    style_colors [ ImGuiCol_SeparatorActive ] = accent;
+    style_colors [ ImGuiCol_Tab ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.10f : 0.14f );
+    style_colors [ ImGuiCol_TabHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.20f : 0.28f );
+    style_colors [ ImGuiCol_TabSelected ] = gui_theme_accent_muted( state.config.accent_index , state.light_mode );
+    style_colors [ ImGuiCol_TabSelectedOverline ] = accent;
+    style_colors [ ImGuiCol_FrameBgHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.16f : 0.28f );
+    style_colors [ ImGuiCol_FrameBgActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.24f : 0.38f );
+    style_colors [ ImGuiCol_PlotHistogram ] = accent;
+    style_colors [ ImGuiCol_PlotHistogramHovered ] = ImVec4( accent.x * 1.05f , accent.y * 1.05f , accent.z * 1.05f , 1.0f );
+}
+
 void gui_theme_init( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
@@ -63,7 +98,6 @@ void gui_theme_init( gui_app_state& state )
 void gui_theme_apply( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
-    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
 
     if ( state.light_mode )
     {
@@ -113,32 +147,12 @@ void gui_theme_apply( gui_app_state& state )
         style_colors [ ImGuiCol_TableRowBgAlt ] = ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
     }
 
-    style_colors [ ImGuiCol_Header ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.22f : 0.35f );
-    style_colors [ ImGuiCol_HeaderHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.32f : 0.50f );
-    style_colors [ ImGuiCol_HeaderActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.42f : 0.65f );
-    style_colors [ ImGuiCol_Button ] = ImVec4( accent.x , accent.y , accent.z , 1.0f );
-    style_colors [ ImGuiCol_ButtonHovered ] = ImVec4(
-        ( std::min )( accent.x * 1.08f , 1.0f ) ,
-        ( std::min )( accent.y * 1.08f , 1.0f ) ,
-        ( std::min )( accent.z * 1.08f , 1.0f ) ,
-        1.0f );
-    style_colors [ ImGuiCol_ButtonActive ] = ImVec4( accent.x * 0.88f , accent.y * 0.88f , accent.z * 0.88f , 1.0f );
-    style_colors [ ImGuiCol_CheckMark ] = accent;
-    style_colors [ ImGuiCol_SliderGrab ] = accent;
-    style_colors [ ImGuiCol_SliderGrabActive ] = ImVec4( accent.x * 0.9f , accent.y * 0.9f , accent.z * 0.9f , 1.0f );
-    style_colors [ ImGuiCol_ScrollbarGrab ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.55f : 0.65f );
-    style_colors [ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( accent.x , accent.y , accent.z , 0.85f );
-    style_colors [ ImGuiCol_ScrollbarGrabActive ] = accent;
-    style_colors [ ImGuiCol_TextSelectedBg ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.28f : 0.40f );
-    style_colors [ ImGuiCol_NavHighlight ] = ImVec4( accent.x , accent.y , accent.z , 0.70f );
     style_colors [ ImGuiCol_Separator ] = style_colors [ ImGuiCol_Border ];
-    style_colors [ ImGuiCol_SeparatorHovered ] = ImVec4( accent.x , accent.y , accent.z , 0.55f );
-    style_colors [ ImGuiCol_SeparatorActive ] = accent;
     style_colors [ ImGuiCol_FrameBg ] = state.light_mode
         ? ImVec4( 0.90f , 0.91f , 0.93f , 1.0f )
         : ImVec4( 0.16f , 0.17f , 0.20f , 1.0f );
-    style_colors [ ImGuiCol_FrameBgHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.16f : 0.28f );
-    style_colors [ ImGuiCol_FrameBgActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.24f : 0.38f );
+
+    gui_theme_apply_accent_colors( state );
 
     if ( state.font_body )
     {
