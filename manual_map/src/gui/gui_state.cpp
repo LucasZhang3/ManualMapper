@@ -640,7 +640,7 @@ namespace
 
             ImGui::PushID( static_cast< int >( pid ) );
 
-            if ( ImGui::SmallButton( label.c_str( ) ) )
+            if ( gui_small_button( label.c_str( ) ) )
             {
                 state.selected_pid = static_cast< int >( pid );
             }
@@ -843,7 +843,7 @@ namespace
             ImGui::SameLine( 0.0f , 0.0f );
             ImGui::SetCursorScreenPos( ImVec2( card_pos.x + card_width - 32.0f , card_pos.y + 12.0f ) );
 
-            if ( ImGui::Button( "X" , ImVec2( 28.0f , 0.0f ) ) )
+            if ( gui_button( "X" , ImVec2( 28.0f , 0.0f ) ) )
             {
                 remove_recent_dll( state.config , dll_path );
                 save_config( state.config );
@@ -863,7 +863,7 @@ namespace
         ImGui::InputText( "##queue_input" , state.queue_dll_input , sizeof( state.queue_dll_input ) );
         ImGui::SameLine( );
 
-        if ( ImGui::Button( "Add" ) && state.queue_dll_input [ 0 ] )
+        if ( gui_button( "Add" ) && state.queue_dll_input [ 0 ] )
         {
             state.config.dll_queue.push_back( utf8_to_wide( state.queue_dll_input ) );
             state.inject_queue = state.config.dll_queue;
@@ -877,7 +877,7 @@ namespace
             ImGui::BulletText( "%s" , wide_to_utf8( state.config.dll_queue [ idx ] ).c_str( ) );
             ImGui::SameLine( );
 
-            if ( ImGui::SmallButton( "Remove" ) )
+            if ( gui_small_button( "Remove" ) )
             {
                 state.config.dll_queue.erase( state.config.dll_queue.begin( ) + static_cast< ptrdiff_t >( idx ) );
                 state.inject_queue = state.config.dll_queue;
@@ -923,7 +923,7 @@ namespace
         gui_draw_help_marker( "Shows only log lines containing the entered text." );
         ImGui::SameLine( );
 
-        if ( ImGui::Button( "Copy Log" ) )
+        if ( gui_button( "Copy Log" ) )
         {
             std::string text;
             {
@@ -982,7 +982,7 @@ namespace
         {
             ImGui::SetCursorScreenPos( ImVec2( ImGui::GetWindowPos( ).x + ImGui::GetWindowWidth( ) - 120.0f , ImGui::GetWindowPos( ).y + 8.0f ) );
 
-            if ( ImGui::SmallButton( "Jump to bottom" ) )
+            if ( gui_small_button( "Jump to bottom" ) )
             {
                 state.log_follow_tail = true;
             }
@@ -1049,7 +1049,7 @@ namespace
 
             ImGui::SameLine( );
 
-            if ( ImGui::Button( "Refresh" , ImVec2( -1.0f , 0.0f ) ) )
+            if ( gui_button( "Refresh" , ImVec2( -1.0f , 0.0f ) ) )
             {
                 refresh_processes( state );
             }
@@ -1097,7 +1097,7 @@ namespace
 
             ImGui::SameLine( );
 
-            if ( ImGui::Button( "Browse" , ImVec2( -1.0f , 0.0f ) ) )
+            if ( gui_button( "Browse" , ImVec2( -1.0f , 0.0f ) ) )
             {
                 const auto selected = pick_dll_path( utf8_to_wide( state.dll_path ) );
 
@@ -1139,33 +1139,23 @@ namespace
         ImGui::EndChild( );
 
         const bool busy = state.injecting.load( );
+        constexpr ImVec2 k_action_button_size( 136.0f , 0.0f );
 
         if ( busy )
         {
             ImGui::BeginDisabled( );
         }
 
-        ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent( state.config.accent_index ) );
-        ImGui::PushStyleVar( ImGuiStyleVar_FramePadding , ImVec2( 18.0f , 10.0f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_FramePadding , ImVec2( 14.0f , 8.0f ) );
 
-        if ( ImGui::Button( "Inject" , ImVec2( 160.0f , 0.0f ) ) )
+        if ( gui_button( "Inject" , k_action_button_size ) )
         {
             start_injection( state );
         }
 
-        ImGui::PopStyleVar( );
-        ImGui::PopStyleColor( );
-
-        if ( busy )
-        {
-            ImGui::EndDisabled( );
-            ImGui::SameLine( );
-            ImGui::ProgressBar( state.inject_progress , ImVec2( 180.0f , 0.0f ) );
-        }
-
         ImGui::SameLine( );
 
-        if ( ImGui::Button( "Run as Admin" ) )
+        if ( gui_button( "Run as Admin" , k_action_button_size ) )
         {
             if ( relaunch_as_admin( L"--gui" ) )
             {
@@ -1175,7 +1165,7 @@ namespace
 
         ImGui::SameLine( );
 
-        if ( ImGui::Button( "Clear Log" ) )
+        if ( gui_button( "Clear Log" , k_action_button_size ) )
         {
             std::lock_guard lock( state.log_mutex );
             state.log.clear( );
@@ -1183,9 +1173,18 @@ namespace
 
         ImGui::SameLine( );
 
-        if ( ImGui::Button( "Export Log" ) )
+        if ( gui_button( "Export Log" , k_action_button_size ) )
         {
             export_log( state );
+        }
+
+        ImGui::PopStyleVar( );
+
+        if ( busy )
+        {
+            ImGui::EndDisabled( );
+            ImGui::SameLine( );
+            ImGui::ProgressBar( state.inject_progress , ImVec2( 180.0f , 0.0f ) );
         }
     }
 
@@ -1209,7 +1208,7 @@ namespace
             ImGui::Text( "%s | %s | %s" , wide_to_utf8( entry.timestamp ).c_str( ) , wide_to_utf8( entry.target ).c_str( ) , wide_to_utf8( entry.dll ).c_str( ) );
             ImGui::SameLine( );
 
-            if ( ImGui::SmallButton( "Re-inject" ) )
+            if ( gui_small_button( "Re-inject" ) )
             {
                 std::strncpy( state.dll_path , wide_to_utf8( entry.dll ).c_str( ) , sizeof( state.dll_path ) - 1 );
                 refresh_dll_pe( state );
@@ -1389,7 +1388,7 @@ namespace
             ImGui::InputText( "Profile name" , state.new_profile_name , sizeof( state.new_profile_name ) );
             ImGui::SameLine( );
 
-            if ( ImGui::Button( "Save current as profile" ) && state.new_profile_name [ 0 ] )
+            if ( gui_button( "Save current as profile" ) && state.new_profile_name [ 0 ] )
             {
                 inject_profile profile {};
                 profile.name = utf8_to_wide( state.new_profile_name );
@@ -1410,7 +1409,7 @@ namespace
                 ImGui::BulletText( "%s" , wide_to_utf8( profile.name ).c_str( ) );
                 ImGui::SameLine( );
 
-                if ( ImGui::SmallButton( "Load" ) )
+                if ( gui_small_button( "Load" ) )
                 {
                     std::strncpy( state.dll_path , wide_to_utf8( profile.dll_path ).c_str( ) , sizeof( state.dll_path ) - 1 );
                     std::strncpy( state.search , wide_to_utf8( profile.process_name ).c_str( ) , sizeof( state.search ) - 1 );
@@ -1422,7 +1421,7 @@ namespace
 
                 ImGui::SameLine( );
 
-                if ( ImGui::SmallButton( "Delete" ) )
+                if ( gui_small_button( "Delete" ) )
                 {
                     state.config.profiles.erase( state.config.profiles.begin( ) + static_cast< ptrdiff_t >( idx ) );
                     save_config( state.config );
@@ -1444,7 +1443,7 @@ namespace
                 save_config( state.config );
             }
 
-            if ( ImGui::Button( "Export Settings" , ImVec2( 140.0f , 0.0f ) ) )
+            if ( gui_button( "Export Settings" , ImVec2( 140.0f , 0.0f ) ) )
             {
                 wchar_t path [ MAX_PATH ] = L"manual_map_settings.ini";
                 OPENFILENAMEW dialog {};
@@ -1466,7 +1465,7 @@ namespace
 
             ImGui::SameLine( );
 
-            if ( ImGui::Button( "Import Settings" , ImVec2( 140.0f , 0.0f ) ) )
+            if ( gui_button( "Import Settings" , ImVec2( 140.0f , 0.0f ) ) )
             {
                 wchar_t path [ MAX_PATH ] = {};
                 OPENFILENAMEW dialog {};
@@ -1567,7 +1566,7 @@ namespace
                 ImGui::Text( "Target name: %s" , state.search );
             }
 
-            if ( ImGui::Button( "Inject" , ImVec2( 120.0f , 0.0f ) ) )
+            if ( gui_button( "Inject" , ImVec2( 120.0f , 0.0f ) ) )
             {
                 launch_injection( state );
                 ImGui::CloseCurrentPopup( );
@@ -1575,7 +1574,7 @@ namespace
 
             ImGui::SameLine( );
 
-            if ( ImGui::Button( "Cancel" , ImVec2( 120.0f , 0.0f ) ) )
+            if ( gui_button( "Cancel" , ImVec2( 120.0f , 0.0f ) ) )
             {
                 ImGui::CloseCurrentPopup( );
             }

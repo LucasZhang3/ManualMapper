@@ -161,6 +161,54 @@ bool gui_draw_pill_toggle( gui_app_state& state , const char* id , bool* value ,
     return toggled;
 }
 
+namespace
+{
+    ImVec4 button_label_color( bool light_mode )
+    {
+        return light_mode ? ImVec4( 0.98f , 0.98f , 1.0f , 1.0f ) : ImVec4( 0.96f , 0.96f , 0.98f , 1.0f );
+    }
+}
+
+bool gui_button( const char* label , const ImVec2& size )
+{
+    const gui_app_state* app_state = gui_app_state_ptr( );
+    const bool style_label = app_state != nullptr;
+
+    if ( style_label )
+    {
+        ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( app_state->light_mode ) );
+    }
+
+    const bool pressed = ImGui::Button( label , size );
+
+    if ( style_label )
+    {
+        ImGui::PopStyleColor( );
+    }
+
+    return pressed;
+}
+
+bool gui_small_button( const char* label )
+{
+    const gui_app_state* app_state = gui_app_state_ptr( );
+    const bool style_label = app_state != nullptr;
+
+    if ( style_label )
+    {
+        ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( app_state->light_mode ) );
+    }
+
+    const bool pressed = ImGui::SmallButton( label );
+
+    if ( style_label )
+    {
+        ImGui::PopStyleColor( );
+    }
+
+    return pressed;
+}
+
 bool gui_begin_section_card( const char* id , const char* title , bool default_open , bool* open_state , float padding_scale )
 {
     const gui_app_state* app_state = gui_app_state_ptr( );

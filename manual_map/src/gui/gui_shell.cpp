@@ -441,8 +441,8 @@ void gui_shell_render(
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , 6.0f ) );
-    begin_shell_child( "##shell_status" , ImVec2( side_pad , display.y - status_h ) , ImVec2( inner_w , status_h ) , status_bg );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + tokens.card_padding , 6.0f ) );
+    begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
     draw_status_bar_content( state );
     end_shell_child( );
     ImGui::PopStyleVar( );
