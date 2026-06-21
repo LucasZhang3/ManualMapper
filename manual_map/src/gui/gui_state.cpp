@@ -705,7 +705,7 @@ namespace
                 if ( selected )
                 {
                     draw->AddRectFilled( item_min , item_max , ImGui::GetColorU32( ImGuiCol_Header ) );
-                    draw->AddRectFilled( ImVec2( item_min.x , item_min.y ) , ImVec2( item_min.x + 3.0f , item_max.y ) , ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) );
+                    draw->AddRectFilled( ImVec2( item_min.x , item_min.y ) , ImVec2( item_min.x + 3.0f , item_max.y ) , ImGui::GetColorU32( gui_theme_accent( ) ) );
                 }
                 else if ( focused || hovered )
                 {
@@ -728,7 +728,7 @@ namespace
                 else
                 {
                     const char letter = avatar_letter( process.name );
-                    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+                    const ImVec4 accent = gui_theme_accent( );
                     const float avatar_r = 12.0f * density_scale;
                     draw->AddCircleFilled( ImVec2( item_min.x + 4.0f + avatar_r , item_min.y + row_height * 0.5f ) , avatar_r , ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.35f ) ) );
                     char letter_buf [ 2 ] = { letter , '\0' };
@@ -823,7 +823,7 @@ namespace
             }
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList( );
-            const ImU32 bg = ImGui::GetColorU32( is_active ? gui_theme_accent_muted( state.config.accent_index , state.light_mode ) : ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
+            const ImU32 bg = ImGui::GetColorU32( is_active ? gui_theme_accent_muted( state.light_mode ) : ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
             draw_list->AddRectFilled( card_pos , ImVec2( card_pos.x + card_width - 36.0f , card_pos.y + card_height ) , bg , 6.0f );
             draw_list->AddRect( card_pos , ImVec2( card_pos.x + card_width - 36.0f , card_pos.y + card_height ) , ImGui::GetColorU32( ImGuiCol_Border ) , 6.0f );
             draw_list->AddText( ImVec2( card_pos.x + inner_pad , card_pos.y + inner_pad ) , ImGui::GetColorU32( ImGuiCol_Text ) , filename.c_str( ) );
@@ -831,7 +831,7 @@ namespace
             if ( pe.valid )
             {
                 const std::string badge = wide_to_utf8( pe.machine_label );
-                draw_list->AddText( ImVec2( card_pos.x + card_width - 90.0f , card_pos.y + inner_pad ) , ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) , badge.c_str( ) );
+                draw_list->AddText( ImVec2( card_pos.x + card_width - 90.0f , card_pos.y + inner_pad ) , ImGui::GetColorU32( gui_theme_accent( ) ) , badge.c_str( ) );
             }
 
             ImGui::SameLine( 0.0f , 0.0f );
@@ -1052,11 +1052,14 @@ namespace
                 refresh_processes( state );
             }
 
-            if ( gui_draw_bool_options( state , "tree_toggle" , &state.show_process_tree , "Flat" , "Tree" , "Group processes by parent PID with indent." ) )
+            if ( ImGui::Checkbox( "Show process tree" , &state.show_process_tree ) )
             {
                 state.config.show_process_tree = state.show_process_tree;
                 save_config( state.config );
             }
+
+            ImGui::SameLine( );
+            gui_draw_help_marker( "Group processes by parent PID with indent." );
 
             draw_favorites_strip( state );
             const auto visible = visible_processes( state );
@@ -1251,56 +1254,32 @@ namespace
 
         if ( gui_begin_section_card( "AppearanceSection" , "Appearance" , true , &state.config.settings_appearance_open ) )
         {
-            if ( gui_draw_bool_options( state , "theme_toggle" , &state.light_mode , "Dark" , "Light" , "Switch between light and dark interface themes." ) )
+            if ( ImGui::Checkbox( "Light mode" , &state.light_mode ) )
             {
                 state.config.light_mode = state.light_mode;
                 gui_theme_apply( state );
                 save_config( state.config );
             }
 
-            ImGui::TextUnformatted( "Accent color" );
+            ImGui::SameLine( );
+            gui_draw_help_marker( "Switch between light and dark interface themes." );
 
-            for ( int idx = 0; idx < 4; ++idx )
-            {
-                ImGui::PushID( idx );
-                ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent( idx ) );
-
-                if ( ImGui::Button( "##accent" , ImVec2( 28.0f , 28.0f ) ) )
-                {
-                    state.config.accent_index = idx;
-                    gui_theme_apply_accent_colors( state );
-                    save_config( state.config );
-                }
-
-                ImGui::PopStyleColor( );
-
-                if ( state.config.accent_index == idx )
-                {
-                    ImGui::GetWindowDrawList( )->AddRect(
-                        ImGui::GetItemRectMin( ) ,
-                        ImGui::GetItemRectMax( ) ,
-                        ImGui::GetColorU32( ImVec4( 1.0f , 1.0f , 1.0f , state.light_mode ? 0.85f : 1.0f ) ) ,
-                        4.0f ,
-                        0 ,
-                        2.0f );
-                }
-
-                ImGui::SameLine( );
-                ImGui::PopID( );
-            }
-
-            ImGui::NewLine( );
-
-            if ( gui_draw_bool_options( state , "compact_toggle" , &state.config.compact_mode , "Comfortable" , "Compact" , "Tighter spacing and smaller fonts." ) )
+            if ( ImGui::Checkbox( "Compact mode" , &state.config.compact_mode ) )
             {
                 gui_theme_init( state );
                 save_config( state.config );
             }
 
-            if ( gui_draw_bool_options( state , "tray_toggle" , &state.config.min_to_tray , "Minimize normally" , "Min to tray" , "Minimize button sends app to system tray." ) )
+            ImGui::SameLine( );
+            gui_draw_help_marker( "Tighter spacing and smaller fonts." );
+
+            if ( ImGui::Checkbox( "Minimize to tray" , &state.config.min_to_tray ) )
             {
                 save_config( state.config );
             }
+
+            ImGui::SameLine( );
+            gui_draw_help_marker( "Minimize button sends app to system tray." );
 
             gui_end_section_card( );
         }
@@ -1314,13 +1293,16 @@ namespace
                 ImGui::BeginDisabled( );
             }
 
-            if ( gui_draw_bool_options( state , "stealth_toggle" , &state.stealth_capture , "Visible" , "Stealth" , "Capture visibility for Discord/OBS." ) )
+            if ( ImGui::Checkbox( "Stealth capture" , &state.stealth_capture ) )
             {
                 if ( !set_stealth_capture( state , state.stealth_capture ) )
                 {
                     state.stealth_capture = !state.stealth_capture;
                 }
             }
+
+            ImGui::SameLine( );
+            gui_draw_help_marker( "Capture visibility for Discord/OBS." );
 
             if ( !supported )
             {
@@ -1332,9 +1314,9 @@ namespace
 
         if ( gui_begin_section_card( "InjectionSection" , "Injection" , true , &state.config.settings_injection_open ) )
         {
-            gui_draw_toggle_chip( state , "wait_toggle" , &state.wait_for_process , "Wait up to 30 seconds for process" );
-            gui_draw_toggle_chip( state , "inject_all_toggle" , &state.inject_all , "Inject all matching instances" );
-            gui_draw_toggle_chip( state , "auto_inject_toggle" , &state.auto_inject , "Auto-inject when process appears" );
+            ImGui::Checkbox( "Wait up to 30 seconds for process" , &state.wait_for_process );
+            ImGui::Checkbox( "Inject all matching instances" , &state.inject_all );
+            ImGui::Checkbox( "Auto-inject when process appears" , &state.auto_inject );
             ImGui::SetNextItemWidth( 120.0f );
             ImGui::InputInt( "Delay before inject (seconds)" , &state.inject_delay_sec );
             state.inject_delay_sec = ( std::max )( 0 , state.inject_delay_sec );
@@ -1353,7 +1335,7 @@ namespace
 
         if ( gui_begin_section_card( "LoggingSection" , "Logging" , true , &state.config.settings_logging_open ) )
         {
-            if ( gui_draw_toggle_chip( state , "timestamps_toggle" , &state.log_timestamps , "Log timestamps" ) )
+            if ( ImGui::Checkbox( "Log timestamps" , &state.log_timestamps ) )
             {
                 state.config.log_timestamps = state.log_timestamps;
                 save_config( state.config );
@@ -1364,7 +1346,7 @@ namespace
 
         if ( gui_begin_section_card( "SafetySection" , "Safety" , true , &state.config.settings_safety_open ) )
         {
-            if ( gui_draw_toggle_chip( state , "allowlist_toggle" , &state.use_allowlist , "Allowlist mode (off = blocklist)" ) )
+            if ( ImGui::Checkbox( "Allowlist mode (off = blocklist)" , &state.use_allowlist ) )
             {
                 state.config.use_allowlist = state.use_allowlist;
                 save_config( state.config );

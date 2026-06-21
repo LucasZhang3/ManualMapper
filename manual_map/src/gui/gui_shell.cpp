@@ -207,7 +207,7 @@ namespace
             { gui_page::settings , "Settings" }
         };
 
-        const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+        const ImVec4 accent = gui_theme_accent( );
         const float tab_h = tokens.tab_bar_height - 8.0f;
         const float text_pad = ( tab_h - ImGui::GetTextLineHeight( ) ) * 0.5f;
         const float frame_pad_y = text_pad > 0.0f ? text_pad : 0.0f;
@@ -229,7 +229,7 @@ namespace
 
             if ( selected )
             {
-                const ImVec4 selected_bg = gui_theme_accent_muted( state.config.accent_index , state.light_mode );
+                const ImVec4 selected_bg = gui_theme_accent_muted( state.light_mode );
                 ImGui::PushStyleColor( ImGuiCol_Button , selected_bg );
                 ImGui::PushStyleColor( ImGuiCol_ButtonHovered , selected_bg );
                 ImGui::PushStyleColor( ImGuiCol_ButtonActive , selected_bg );
@@ -313,7 +313,7 @@ namespace
         const ImVec2 privilege_size = ImGui::CalcTextSize( privilege_label );
         ImGui::SameLine( content_width - privilege_size.x - right_gutter );
         ImGui::TextColored(
-            elevated ? gui_theme_accent( state.config.accent_index ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ,
+            elevated ? gui_theme_accent( ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ,
             "%s" ,
             privilege_label );
     }
@@ -442,7 +442,7 @@ void gui_shell_render(
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + tokens.card_padding + 8.0f , 8.0f ) );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( side_pad + 32.0f , 6.0f ) );
     begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
     draw_status_bar_content( state );
     end_shell_child( );

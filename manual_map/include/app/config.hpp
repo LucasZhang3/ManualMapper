@@ -42,7 +42,6 @@ struct app_config
     std::wstring language = L"en";
 
     bool light_mode = false;
-    int accent_index = 0;
     bool compact_mode = false;
     bool first_run_complete = false;
     bool min_to_tray = false;

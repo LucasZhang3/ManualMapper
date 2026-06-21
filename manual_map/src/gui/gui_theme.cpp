@@ -9,24 +9,17 @@ namespace
 {
     gui_theme_tokens g_tokens {};
 
-    const ImVec4 g_accents [ 4 ] =
-    {
-        ImVec4( 0.55f , 0.35f , 0.95f , 1.0f ) ,
-        ImVec4( 0.20f , 0.65f , 0.85f , 1.0f ) ,
-        ImVec4( 0.90f , 0.45f , 0.35f , 1.0f ) ,
-        ImVec4( 0.35f , 0.85f , 0.55f , 1.0f )
-    };
+    const ImVec4 g_accent = ImVec4( 0.20f , 0.65f , 0.85f , 1.0f );
 }
 
-ImVec4 gui_theme_accent( int accent_index )
+ImVec4 gui_theme_accent( )
 {
-    const int idx = accent_index < 0 ? 0 : ( accent_index >= 4 ? 3 : accent_index );
-    return g_accents [ idx ];
+    return g_accent;
 }
 
-ImVec4 gui_theme_accent_muted( int accent_index , bool light_mode )
+ImVec4 gui_theme_accent_muted( bool light_mode )
 {
-    ImVec4 accent = gui_theme_accent( accent_index );
+    const ImVec4 accent = g_accent;
 
     if ( light_mode )
     {
@@ -54,7 +47,7 @@ const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state )
 
 void gui_theme_apply_accent_colors( gui_app_state& state )
 {
-    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+    const ImVec4 accent = gui_theme_accent( );
     ImVec4* style_colors = ImGui::GetStyle( ).Colors;
 
     style_colors [ ImGuiCol_Header ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.22f : 0.35f );
@@ -79,7 +72,7 @@ void gui_theme_apply_accent_colors( gui_app_state& state )
     style_colors [ ImGuiCol_SeparatorActive ] = accent;
     style_colors [ ImGuiCol_Tab ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.10f : 0.14f );
     style_colors [ ImGuiCol_TabHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.20f : 0.28f );
-    style_colors [ ImGuiCol_TabSelected ] = gui_theme_accent_muted( state.config.accent_index , state.light_mode );
+    style_colors [ ImGuiCol_TabSelected ] = gui_theme_accent_muted( state.light_mode );
     style_colors [ ImGuiCol_TabSelectedOverline ] = accent;
     style_colors [ ImGuiCol_FrameBgHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.16f : 0.28f );
     style_colors [ ImGuiCol_FrameBgActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.24f : 0.38f );

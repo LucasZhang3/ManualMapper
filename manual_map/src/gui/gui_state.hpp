@@ -61,7 +61,6 @@ struct gui_app_state
 
     gui_page current_page = gui_page::injection;
     std::vector< gui_toast > toasts;
-    std::unordered_map< ImGuiID , float > pill_anim;
     bool command_palette_open = false;
     bool log_follow_tail = true;
     bool log_scroll_to_bottom = false;

@@ -103,65 +103,6 @@ void gui_draw_help_marker( const char* description )
     }
 }
 
-bool gui_draw_pill_toggle( gui_app_state& state , const char* id , bool* value , const char* label_on , const char* label_off , const char* tooltip )
-{
-    ImGuiStyle& style = ImGui::GetStyle( );
-    const float height = ImGui::GetFrameHeight( );
-    const float width = height * 2.0f;
-    const float radius = height * 0.5f;
-    const ImVec2 pos = ImGui::GetCursorScreenPos( );
-    const ImGuiID widget_id = ImGui::GetID( id );
-
-    ImGui::InvisibleButton( id , ImVec2( width , height ) );
-
-    bool toggled = false;
-
-    if ( ImGui::IsItemClicked( ) )
-    {
-        *value = !*value;
-        toggled = true;
-    }
-
-    float& anim = state.pill_anim [ widget_id ];
-
-    if ( anim < 0.0f )
-    {
-        anim = *value ? 1.0f : 0.0f;
-    }
-
-    const float target = *value ? 1.0f : 0.0f;
-    anim += ( target - anim ) * ( std::min )( 1.0f , ImGui::GetIO( ).DeltaTime * 12.0f );
-
-    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
-    const ImVec4 track_mix(
-        0.22f + ( accent.x - 0.22f ) * anim ,
-        0.24f + ( accent.y - 0.24f ) * anim ,
-        0.30f + ( accent.z - 0.30f ) * anim ,
-        1.0f );
-    const ImU32 track_mix_color = ImGui::GetColorU32( track_mix );
-    ImDrawList* draw = ImGui::GetWindowDrawList( );
-    draw->AddRectFilled( pos , ImVec2( pos.x + width , pos.y + height ) , track_mix_color , radius );
-
-    if ( ImGui::IsItemHovered( ) )
-    {
-        draw->AddRectFilled( pos , ImVec2( pos.x + width , pos.y + height ) , ImGui::GetColorU32( ImVec4( 1 , 1 , 1 , 0.06f ) ) , radius );
-    }
-
-    const float knob_x = pos.x + radius + anim * ( width - radius * 2.0f );
-    draw->AddCircleFilled( ImVec2( knob_x , pos.y + radius ) , radius - 3.0f , IM_COL32( 255 , 255 , 255 , 255 ) );
-
-    ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
-    ImGui::AlignTextToFramePadding( );
-    ImGui::TextUnformatted( *value ? label_on : label_off );
-
-    if ( tooltip )
-    {
-        gui_draw_help_marker( tooltip );
-    }
-
-    return toggled;
-}
-
 namespace
 {
     ImVec4 button_label_color( bool light_mode )
@@ -207,98 +148,6 @@ bool gui_small_button( const char* label )
         ImGui::PopStyleColor( );
     }
 
-    return pressed;
-}
-
-bool gui_draw_bool_options( gui_app_state& state , const char* id , bool* value , const char* false_label , const char* true_label , const char* tooltip )
-{
-    ImGui::PushID( id );
-    bool changed = false;
-    const char* labels [ 2 ] = { false_label , true_label };
-
-    for ( int option = 0; option < 2; ++option )
-    {
-        const bool selected = ( *value ) == ( option == 1 );
-
-        if ( option > 0 )
-        {
-            ImGui::SameLine( );
-        }
-
-        if ( selected )
-        {
-            ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
-            ImGui::PushStyleColor( ImGuiCol_ButtonHovered , gui_theme_accent( state.config.accent_index ) );
-            ImGui::PushStyleColor( ImGuiCol_ButtonActive , gui_theme_accent( state.config.accent_index ) );
-            ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( state.light_mode ) );
-        }
-        else
-        {
-            ImGui::PushStyleColor( ImGuiCol_Button , ImGui::GetStyleColorVec4( ImGuiCol_FrameBg ) );
-            ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgHovered ) );
-            ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgActive ) );
-            ImGui::PushStyleColor( ImGuiCol_Text , ImGui::GetStyleColorVec4( ImGuiCol_Text ) );
-        }
-
-        if ( ImGui::Button( labels [ option ] , ImVec2( 0.0f , 0.0f ) ) )
-        {
-            *value = option == 1;
-            changed = true;
-        }
-
-        if ( selected )
-        {
-            ImGui::GetWindowDrawList( )->AddRect(
-                ImGui::GetItemRectMin( ) ,
-                ImGui::GetItemRectMax( ) ,
-                ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) ,
-                ImGui::GetStyle( ).FrameRounding ,
-                0 ,
-                2.0f );
-        }
-
-        ImGui::PopStyleColor( 4 );
-    }
-
-    if ( tooltip )
-    {
-        gui_draw_help_marker( tooltip );
-    }
-
-    ImGui::PopID( );
-    return changed;
-}
-
-bool gui_draw_toggle_chip( gui_app_state& state , const char* id , bool* value , const char* label )
-{
-    ImGui::PushID( id );
-
-    if ( *value )
-    {
-        ImGui::PushStyleColor( ImGuiCol_Button , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , gui_theme_accent( state.config.accent_index ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonActive , gui_theme_accent( state.config.accent_index ) );
-        ImGui::PushStyleColor( ImGuiCol_Text , button_label_color( state.light_mode ) );
-    }
-    else
-    {
-        ImGui::PushStyleColor( ImGuiCol_Button , ImGui::GetStyleColorVec4( ImGuiCol_FrameBg ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgHovered ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImGui::GetStyleColorVec4( ImGuiCol_FrameBgActive ) );
-        ImGui::PushStyleColor( ImGuiCol_Text , ImGui::GetStyleColorVec4( ImGuiCol_Text ) );
-    }
-
-    char button_label [ 192 ] = {};
-    std::snprintf( button_label , sizeof( button_label ) , "%s  %s" , *value ? "[x]" : "[ ]" , label );
-    const bool pressed = ImGui::Button( button_label , ImVec2( -1.0f , 0.0f ) );
-
-    if ( pressed )
-    {
-        *value = !*value;
-    }
-
-    ImGui::PopStyleColor( 4 );
-    ImGui::PopID( );
     return pressed;
 }
 
@@ -488,7 +337,8 @@ void gui_draw_drag_overlay( gui_app_state& state )
     const ImGuiIO& io = ImGui::GetIO( );
     ImDrawList* draw = ImGui::GetForegroundDrawList( );
     const float alpha = ( std::min )( 1.0f , state.drag_highlight_timer );
-    const ImU32 fill = ImGui::GetColorU32( ImVec4( gui_theme_accent( state.config.accent_index ).x , gui_theme_accent( state.config.accent_index ).y , gui_theme_accent( state.config.accent_index ).z , 0.18f * alpha ) );
+    const ImVec4 accent = gui_theme_accent( );
+    const ImU32 fill = ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.18f * alpha ) );
     draw->AddRectFilled( ImVec2( 0 , 0 ) , io.DisplaySize , fill );
     const char* text = "Drop DLL here";
     const ImVec2 text_size = ImGui::CalcTextSize( text );

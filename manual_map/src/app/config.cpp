@@ -196,10 +196,6 @@ namespace
         {
             config.light_mode = parse_bool( value , config.light_mode );
         }
-        else if ( key == L"accent_index" )
-        {
-            config.accent_index = parse_int( value , config.accent_index );
-        }
         else if ( key == L"compact_mode" )
         {
             config.compact_mode = parse_bool( value , config.compact_mode );
@@ -363,7 +359,6 @@ namespace
         file << L"cli_notes=" << config.cli_notes << L"\n";
         file << L"language=" << config.language << L"\n";
         file << L"light_mode=" << ( config.light_mode ? L"1" : L"0" ) << L"\n";
-        file << L"accent_index=" << config.accent_index << L"\n";
         file << L"compact_mode=" << ( config.compact_mode ? L"1" : L"0" ) << L"\n";
         file << L"first_run_complete=" << ( config.first_run_complete ? L"1" : L"0" ) << L"\n";
         file << L"min_to_tray=" << ( config.min_to_tray ? L"1" : L"0" ) << L"\n";
