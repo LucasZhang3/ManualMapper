@@ -2,9 +2,52 @@
 
 `manual_map.exe` is the console front-end for the same injection engine used by the GUI. Source: `manual_map/src/cli/main.cpp`.
 
-![CLI process list](../images/15-cli-list-processes.png)
+### Process list output (`--list`)
 
-*Screenshot placeholder: terminal output from `manual_map.exe --list`.*
+There is no bundled screenshot for CLI output. The feature works as follows: `manual_map.exe --list` enumerates processes via the same backend as the GUI (`process_list.cpp`), prints a fixed-width table to **stdout**, and exits with code `0`.
+
+**Example session** (representative output; PIDs vary by machine):
+
+```text
+> manual_map.exe --list --search notepad
+
+  PID      Process
+  -------- --------------------
+  18452    notepad.exe
+
+> manual_map.exe --list
+
+  PID      Process
+  -------- --------------------
+  1234     explorer.exe
+  5678     notepad.exe
+  ...
+```
+
+```mermaid
+flowchart LR
+    A[argv --list] --> B[enumerate_processes]
+    B --> C{--search set?}
+    C -->|yes| D[filter name or PID substring]
+    C -->|no| E[all processes]
+    D --> F[printf table]
+    E --> F
+    F --> G[exit 0]
+```
+
+**Columns:** decimal PID, executable file name (not full path). Sort order matches internal list order (typically creation order from toolhelp snapshot).
+
+**Filtering:** `--search notepad` matches case-insensitive substring in process name **or** PID string. Combine with `--list` only; other inject flags are ignored when listing.
+
+**Scripting tip:** Pipe to `findstr` on Windows for further filtering:
+
+```text
+manual_map.exe --list | findstr /i notepad
+```
+
+**Failure modes:** If enumeration fails (rare), stderr may show an error and exit code is non-zero. Run elevated if you need processes visible only to admin.
+
+*Optional screenshot: save terminal capture as `docs/images/15-cli-list-processes.png` if you want a PNG in docs.*
 
 ---
 

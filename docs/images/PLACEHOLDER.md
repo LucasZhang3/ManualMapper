@@ -17,6 +17,8 @@ Replace each file below with a real PNG screenshot from the running application.
 | `11-settings-injection.png` | Settings: Injection options |
 | `12-settings-payload.png` | Settings: Payload DLL feature toggles |
 | `13-command-palette.png` | Ctrl+K command palette open |
-| `14-first-run-wizard.png` | First-run wizard modal |
-| `15-cli-list-processes.png` | CLI `--list` output in terminal |
-| `16-drag-drop-overlay.png` | Drag-and-drop DLL highlight overlay |
+| `14-first-run-wizard.png` | **Optional (not bundled).** First-run wizard modal. Documented with mermaid in [gui-application.md](../gui-application.md). |
+| `15-cli-list-processes.png` | **Optional (not bundled).** CLI `--list` output in terminal. Example text output in [cli-reference.md](../cli-reference.md). |
+| `16-drag-drop-overlay.png` | **Optional (not bundled).** Drag-and-drop DLL highlight overlay. Sequence diagram in [gui-application.md](../gui-application.md). |
+
+Screenshots **01 through 13** are the primary visual set used in README and docs. Items **14-16** are optional; documentation describes those features without requiring PNG files.

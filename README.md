@@ -1,91 +1,243 @@
-# Manual Map Injector
+<p align="center">
+  <img src="manual_map/src/gui/assets/app_icon.png" alt="Manual Map Injector icon" width="128" height="128" />
+</p>
 
-A Windows x64 toolset for **manual mapping** DLLs into running processes. The project ships three user-facing programs plus a shared core library:
+<h1 align="center">Manual Map Injector</h1>
 
-| Artifact | Role |
-|----------|------|
-| `manual_map_gui.exe` | Primary ImGui desktop application (tabs, settings, logging, injection UI) |
-| `manual_map.exe` | Console CLI for scripting and interactive injection |
-| `payload_dll.dll` | Reference payload DLL with verification popup, logging, IPC, and diagnostics |
-| `manual_map_core.lib` | Static library: manual mapper, config, process list, inject service, PE utilities |
+<p align="center">
+  <strong>Windows x64 manual DLL mapper</strong> with ImGui desktop UI, console CLI, and a full-featured reference payload.
+</p>
 
-The injector reads a DLL from disk, maps it into a target process without `LoadLibrary` in the injector, and runs a **position-independent loader shellcode** inside the target to apply relocations, resolve imports, run TLS callbacks, and call `DllMain`. The GUI adds process discovery, safety rules, profiles, history, and deep integration with the reference payload.
-
-![Main window on Injection tab](docs/images/01-main-window-injection.png)
-
-*Screenshot placeholder: full GUI on the Injection tab showing target list, payload column, output log, and action buttons.*
-
----
-
-## Table of contents
-
-1. [Quick start](#quick-start)
-2. [System overview](#system-overview)
-3. [Repository layout](#repository-layout)
-4. [Feature summary](#feature-summary)
-5. [Typical injection flow](#typical-injection-flow)
-6. [Documentation map](#documentation-map)
-7. [Requirements and build](#requirements-and-build)
-8. [Security and responsibility](#security-and-responsibility)
+<p align="center">
+  <a href="docs/INDEX.md">Full documentation index</a> ·
+  <a href="docs/build-and-deployment.md">Build guide</a> ·
+  <a href="docs/gui-application.md">GUI reference</a> ·
+  <a href="docs/manual-map-engine.md">Engine internals</a>
+</p>
 
 ---
 
-## Quick start
+## What this project does
 
-1. **Build** the solution `manual_map.sln` in Visual Studio 2022, configuration **Release**, platform **x64**. See [docs/build-and-deployment.md](docs/build-and-deployment.md).
-2. **Run** `bin\Release\x64\manual_map_gui.exe` (optionally as Administrator for protected targets).
-3. Open **Notepad** (or any test process), click **Refresh** or press **F5** in the GUI.
-4. Select **notepad.exe** in the process list (or type `notepad` in search).
-5. Set payload to `bin\Release\x64\payload_dll.dll` via **Browse** or drag-and-drop.
-6. Click **Inject**. Notepad should show a **Manual Map - Injection Successful** message box when the reference payload attaches.
-7. The GUI status bar should read **Injection succeeded (payload verified)** if the shared-memory handshake completes.
+Manual mapping loads a DLL into another process **without** calling `LoadLibrary` from the injector. Instead:
 
-![Inject success popup in target process](docs/images/06-inject-success-popup.png)
+1. The injector reads the PE file from disk.
+2. It allocates memory inside the target process and writes headers and sections.
+3. A tiny **loader shellcode** (`map_shellcode` in `manual_map/src/manual_map/loader_shellcode.cpp`) runs inside the target, applies relocations, resolves imports, runs TLS callbacks, and calls `DllMain`.
+4. Optional **payload protocol** passes configuration through `DllMain`'s `lpReserved` pointer and confirms success via shared memory plus a MessageBox in the reference payload.
 
-*Screenshot placeholder: MessageBox in Notepad after successful payload_dll injection.*
+This repository is intended for **local debugging, security research, and authorized testing** on systems you control.
 
 ---
 
-## System overview
+## Build artifacts
+
+| Output | Path after Release x64 build | Purpose |
+|--------|------------------------------|---------|
+| `manual_map_gui.exe` | `bin/Release/x64/manual_map_gui.exe` | Primary graphical application |
+| `manual_map.exe` | `bin/Release/x64/manual_map.exe` | Scriptable / interactive CLI |
+| `payload_dll.dll` | `bin/Release/x64/payload_dll.dll` | Reference payload with verify popup, IPC, logging |
+| `manual_map_core.lib` | `bin/Release/x64/manual_map_core.lib` | Shared static library linked by GUI and CLI |
+
+---
+
+## Quick start (Notepad test)
+
+```text
+1. Open manual_map.sln in Visual Studio 2022
+2. Set Release | x64 → Build Solution
+3. Run bin\Release\x64\manual_map_gui.exe (as Admin if needed)
+4. Launch Notepad
+5. Press F5 in the GUI to refresh processes
+6. Select notepad.exe in the list
+7. Browse to bin\Release\x64\payload_dll.dll
+8. Click Inject
+```
+
+**Expected results:**
+
+- Notepad shows **Manual Map - Injection Successful** (MessageBox from payload).
+- GUI status bar: **Injection succeeded (payload verified)**.
+- Output log contains `[payload] Handshake confirmed` lines.
+
+![Inject success in target process](docs/images/06-inject-success-popup.png)
+
+---
+
+## Screenshots
+
+### Application shell
+
+| Injection tab (full window) | Tab bar |
+|:---:|:---:|
+| ![Main window](docs/images/01-main-window-injection.png) | ![Tabs](docs/images/02-tab-bar.png) |
+| Target + payload + log layout | Title bar and three tabs |
+
+| Status bar | History tab |
+|:---:|:---:|
+| ![Status bar](docs/images/07-status-bar.png) | ![History](docs/images/08-history-tab.png) |
+| Ready text, target, Admin/Standard | Re-inject and Clear History |
+
+### Injection tab details
+
+| Process list | Payload panel | Output log |
+|:---:|:---:|:---:|
+| ![Process list](docs/images/03-process-list.png) | ![Payload](docs/images/04-payload-panel.png) | ![Log](docs/images/05-output-log.png) |
+
+### Settings
+
+| Appearance | Capture | Injection | Payload DLL |
+|:---:|:---:|:---:|:---:|
+| ![Appearance](docs/images/09-settings-appearance.png) | ![Capture](docs/images/10-settings-capture.png) | ![Injection settings](docs/images/11-settings-injection.png) | ![Payload settings](docs/images/12-settings-payload.png) |
+
+### Command palette
+
+![Command palette](docs/images/13-command-palette.png)
+
+Press **Ctrl+K** in the GUI for quick actions (refresh, inject, theme, stealth, navigation).
+
+---
+
+## Features without screenshots (documented in depth)
+
+These features are fully implemented. Detailed behavior is in [docs/gui-application.md](docs/gui-application.md) and [docs/cli-reference.md](docs/cli-reference.md).
+
+### First-run wizard
+
+Shown once until `first_run_complete=1` in settings. Three steps: pick DLL, pick process, confirm inject.
+
+```mermaid
+flowchart LR
+    S0[Step 0: DLL] --> S1[Step 1: Process]
+    S1 --> S2[Step 2: Ready]
+    S2 --> Done[first_run_complete saved]
+```
+
+Source: `manual_map/src/gui/gui_widgets.cpp` (`gui_draw_first_run_wizard`).
+
+### CLI process list
+
+```text
+manual_map.exe --list
+manual_map.exe --list --search notepad
+```
+
+Prints PID and process name table to stdout. Source: `manual_map/src/cli/main.cpp`.
+
+### Drag-and-drop DLL
+
+Drop a `.dll` file onto the GUI window. Highlights the window and sets the payload path. Source: `manual_map/src/gui/main.cpp` (`WM_DROPFILES`), overlay in `gui_draw_drag_overlay`.
+
+---
+
+## System architecture
 
 ```mermaid
 flowchart TB
-    subgraph host["Injector process (GUI or CLI)"]
-        UI[gui_state / CLI main]
-        IS[inject_service]
-        PB[payload_bridge]
-        MM[c_manual_map]
-        UI --> IS
+    subgraph Host["Injector (GUI or CLI)"]
+        GS[gui_state.cpp / cli main.cpp]
+        IS[inject_service.cpp]
+        PB[payload_bridge.cpp]
+        MM[manual_map.cpp]
+        GS --> IS
         IS --> PB
         IS --> MM
     end
 
-    subgraph target["Target process (e.g. Notepad)"]
-        SC[map_shellcode]
-        DLL[payload_dll.dll mapped image]
-        SC --> DLL
+    subgraph Target["Target process"]
+        LD[map_shellcode]
+        DLL[payload_dll mapped image]
+        LD --> DLL
     end
 
-    MM -->|WriteProcessMemory + remote thread| SC
-    PB -->|Named file mapping + payload_config| DLL
-    IS -->|Read PE bytes| MM
+    MM -->|VirtualAllocEx + WriteProcessMemory| LD
+    PB -->|payload_config + file mapping| DLL
 ```
 
-**Host side:** The GUI or CLI builds an `inject_request`, optionally prepares a `payload_config` and shared status mapping (`payload_bridge`), reads the DLL into memory, and calls `c_manual_map::inject_pid`.
+| Layer | Directory | Responsibility |
+|-------|-----------|----------------|
+| GUI | `manual_map/src/gui/` | ImGui UI, pages, worker thread inject |
+| App | `manual_map/src/app/` | Config, inject orchestration, PE/process utils |
+| Engine | `manual_map/src/manual_map/` | Remote mapping and loader shellcode |
+| Payload | `payload_dll/` | In-target reference DLL and protocol |
+| Headers | `manual_map/include/` | Public structs and APIs |
 
-**Target side:** Allocated memory holds a copy of the PE image, loader shellcode, and `map_shellcode_data`. A hijacked or created thread runs `map_shellcode`, which performs in-process mapping and calls `DllMain(DLL_PROCESS_ATTACH, reserved_data)`.
-
-Detailed stage-by-stage behavior is in [docs/manual-map-engine.md](docs/manual-map-engine.md).
+Full module graph: [docs/architecture.md](docs/architecture.md).
 
 ---
 
-## Repository layout
+## Injection sequence
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant G as manual_map_gui
+    participant I as inject_service
+    participant P as payload_bridge
+    participant M as c_manual_map
+    participant T as Target
+    participant D as payload_dll
+
+    U->>G: Inject
+    G->>I: run_injection
+    I->>P: prepare_payload_session
+    I->>M: inject_pid + payload_config
+    M->>T: map_shellcode thread
+    T->>D: DllMain ATTACH
+    D-->>T: MessageBox + RUNNING status
+    M-->>I: code 0
+    I->>P: verify_payload_handshake
+    I-->>G: payload_verified
 ```
-manual_map/                          # Solution root
-├── manual_map.sln                   # VS solution (4 projects)
-├── README.md                        # This file
-├── docs/                            # Extended documentation
+
+Step-by-step loader status codes (`10`, `20`, `30`, `1`, negatives): [docs/manual-map-engine.md](docs/manual-map-engine.md).
+
+---
+
+## Feature matrix
+
+### GUI highlights
+
+| Feature | Where | Source file |
+|---------|-------|-------------|
+| Process search / sort / tree | Injection tab | `gui_state.cpp` |
+| Favorites (right-click) | Process list | `gui_state.cpp` |
+| DLL queue (sequential inject) | Payload panel | `gui_state.cpp` |
+| Resizable log split | Draggable splitter | `gui_state.cpp` |
+| History + Clear History | History tab | `gui_state.cpp`, `config.cpp` |
+| Payload feature toggles | Settings | `gui_state.cpp`, `payload_bridge.cpp` |
+| Stealth capture | Settings / Ctrl+K | `window_stealth.cpp` |
+| Keyboard shortcuts | Global | `gui_state_handle_shortcuts` |
+
+### Payload DLL highlights
+
+| Feature | Default | Doc section |
+|---------|---------|-------------|
+| Success MessageBox | On | [payload-dll.md](docs/payload-dll.md) |
+| Shared memory handshake | On | [payload-dll.md](docs/payload-dll.md) |
+| Named pipe IPC | On | [payload-dll.md](docs/payload-dll.md) |
+| LoadLibrary hook | On | [payload-dll.md](docs/payload-dll.md) |
+| Hotkeys F8/F9/F10 | On | [payload-dll.md](docs/payload-dll.md) |
+
+### Persistence
+
+All GUI toggles and window geometry persist to:
+
+```text
+%APPDATA%\manual_map\settings.ini
+```
+
+Every key documented in [docs/configuration-reference.md](docs/configuration-reference.md).
+
+---
+
+## Repository tree
+
+```text
+manual_map/
+├── README.md
+├── manual_map.sln
+├── docs/                          ← extended developer documentation
 │   ├── INDEX.md
 │   ├── architecture.md
 │   ├── gui-application.md
@@ -94,163 +246,96 @@ manual_map/                          # Solution root
 │   ├── cli-reference.md
 │   ├── configuration-reference.md
 │   ├── build-and-deployment.md
-│   └── images/                      # Screenshot PNGs (see PLACEHOLDER.md)
-├── bin/Release/x64/                 # Built binaries (after build)
-├── manual_map/                      # Core + GUI + CLI sources
-│   ├── include/                     # Public headers (app/, manual_map/, payload/)
-│   ├── src/
-│   │   ├── app/                     # config, inject_service, process_list, pe_util, payload_bridge
-│   │   ├── manual_map/              # c_manual_map, loader_shellcode
-│   │   ├── gui/                     # ImGui shell, state, theme, widgets, tray, stealth
-│   │   └── cli/                     # manual_map.exe entry
-│   ├── manual_map_core.vcxproj
-│   ├── manual_map.vcxproj           # CLI executable
-│   └── manual_map_gui.vcxproj
-├── payload_dll/                     # Reference payload project
-│   ├── dllmain.cpp
-│   ├── payload_runtime.cpp
-│   └── payload_exports.cpp
-└── scripts/                         # commit.ps1, helper scripts
+│   └── images/                    ← screenshots 01-13
+├── bin/Release/x64/               ← build output
+├── manual_map/
+│   ├── include/app|manual_map|payload/
+│   └── src/app|gui|cli|manual_map/
+├── payload_dll/
+└── scripts/commit.ps1
 ```
 
-ImGui lives under `manual_map/third_party/imgui/` as a vendored dependency only. Application logic is under `manual_map/src/` and `payload_dll/`.
+---
+
+## Documentation index
+
+| Document | You will learn |
+|----------|----------------|
+| [docs/INDEX.md](docs/INDEX.md) | Master table of contents |
+| [docs/architecture.md](docs/architecture.md) | Projects, headers, threads, extension points |
+| [docs/gui-application.md](docs/gui-application.md) | Every tab, control, shortcut, overlay |
+| [docs/manual-map-engine.md](docs/manual-map-engine.md) | `map_image`, shellcode, error codes |
+| [docs/payload-dll.md](docs/payload-dll.md) | Config struct, IPC, exports, hotkeys |
+| [docs/cli-reference.md](docs/cli-reference.md) | All CLI flags and interactive mode |
+| [docs/configuration-reference.md](docs/configuration-reference.md) | Every INI key |
+| [docs/build-and-deployment.md](docs/build-and-deployment.md) | VS 2022, MSBuild, scripts, troubleshooting |
 
 ---
 
-## Feature summary
+## Build requirements
 
-### GUI (`manual_map_gui.exe`)
+| Requirement | Value |
+|-------------|-------|
+| OS | Windows 10/11 x64 |
+| IDE | Visual Studio 2022 |
+| Toolset | v143 |
+| Platform | **x64 only** |
+| Configuration | Release (recommended) |
 
-| Area | Capabilities |
-|------|----------------|
-| **Injection tab** | Process search, flat/tree list, sort, favorites, PID selection, payload path, recent DLLs, DLL queue, PE hash display, inject / run as admin / log actions |
-| **History tab** | Last 20 injections with timestamp, target, DLL, success flag, **Re-inject**, **Clear History** |
-| **Settings tab** | Appearance, capture stealth, injection options, logging, safety allowlist/blocklist, profiles, payload DLL toggles, advanced import/export, about |
-| **Shell** | Custom title bar, tab bar, padded status bar, rounded window |
-| **Shortcuts** | F5 refresh, Ctrl+F focus search, Ctrl+L log filter, Ctrl+K palette, Enter inject |
-| **Overlays** | Command palette, first-run wizard, drag-drop highlight, toasts |
-| **Stealth** | `SetWindowDisplayAffinity` for capture exclusion (Discord/OBS) |
-
-![Tab bar](docs/images/02-tab-bar.png)
-
-*Screenshot placeholder: title bar and Injection / History / Settings tabs.*
-
-Full GUI documentation: [docs/gui-application.md](docs/gui-application.md).
-
-### Manual map engine
-
-- Process resolution by name or PID, optional wait-for-process, inject-all matching instances
-- Handle acquisition with debug privilege and thread hijack for loader execution
-- PE validation, section mapping, remote allocation, loader polling with granular status codes
-- Optional `reserved` buffer passed to `DllMain` (used for `payload_config`)
-
-Full engine documentation: [docs/manual-map-engine.md](docs/manual-map-engine.md).
-
-### Reference payload (`payload_dll.dll`)
-
-- Success **MessageBox** on attach (default on for Notepad-style verification)
-- Shared memory status block and injector handshake
-- File log, debug output, proof JSON, module/thread snapshots
-- Heartbeat thread, named pipe IPC, LoadLibrary hook, module watcher, hotkeys (F8/F9/F10), optional overlay window, plugin loader
-- Exported API: `PayloadGetVersion`, `PayloadGetStatus`, `PayloadRequestUnload`, `PayloadDumpModules`, `PayloadSnapshotMemory`
-
-Full payload documentation: [docs/payload-dll.md](docs/payload-dll.md).
-
-### CLI (`manual_map.exe`)
-
-- `--process`, `--pid`, `--dll`, `--list`, `--search`, `--wait`, `--admin`, `--gui`
-- Interactive mode when run without arguments
-
-Full CLI documentation: [docs/cli-reference.md](docs/cli-reference.md).
-
-### Persistence
-
-- Settings: `%APPDATA%\manual_map\settings.ini`
-- Profiles, recent DLLs, injection history (max 20), window geometry, all GUI toggles
-
-Full key list: [docs/configuration-reference.md](docs/configuration-reference.md).
-
----
-
-## Typical injection flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant GUI as manual_map_gui
-    participant IS as inject_service
-    participant PB as payload_bridge
-    participant MM as c_manual_map
-    participant Target as Target process
-    participant PL as payload_dll
-
-    User->>GUI: Select process + DLL, click Inject
-    GUI->>IS: run_injection(request, config)
-    IS->>PB: prepare_payload_session(pid)
-    PB-->>IS: payload_config + status mapping
-    IS->>MM: inject_pid(pid, pe_bytes, config)
-    MM->>Target: Allocate, write image + shellcode
-    MM->>Target: Run map_shellcode thread
-    Target->>PL: DllMain(ATTACH, config)
-    PL->>PL: MessageBox + heartbeat + IPC
-    MM-->>IS: success code 0
-    IS->>PB: verify_payload_handshake()
-    PB-->>IS: payload_verified
-    IS-->>GUI: inject_result
-    GUI->>User: Toast + status bar update
+```powershell
+& "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  manual_map.sln /p:Configuration=Release /p:Platform=x64 /m
 ```
 
-1. User selects target and payload in the GUI (or CLI fills `inject_request`).
-2. `run_injection` reads the DLL file into a byte vector.
-3. If the DLL exports `PayloadGetVersion` (or is named `payload_dll.dll`) and payload protocol is enabled, `payload_bridge` creates `Local\ManualMapPayloadStatus_<pid>` and fills `payload_config` (feature flags, paths, CLI notes, pipe name).
-4. `c_manual_map::map_image` maps sections, writes loader shellcode, starts remote loader, polls `map_shellcode_data.status` until complete or error.
-5. On success, `verify_payload_handshake` waits for `PAYLOAD_STATUS_RUNNING` in shared memory (up to 8 seconds).
-6. GUI records history entry and updates status text.
+Close `manual_map_gui.exe` before rebuilding the GUI (file lock). See [docs/build-and-deployment.md](docs/build-and-deployment.md).
 
 ---
 
-## Documentation map
+## Keyboard shortcuts (GUI)
 
-| Need | Read |
-|------|------|
-| File-level architecture and dependencies | [docs/architecture.md](docs/architecture.md) |
-| Every GUI panel and source file | [docs/gui-application.md](docs/gui-application.md) |
-| Loader status codes and mapping steps | [docs/manual-map-engine.md](docs/manual-map-engine.md) |
-| Payload IPC, exports, hotkeys | [docs/payload-dll.md](docs/payload-dll.md) |
-| Command-line usage | [docs/cli-reference.md](docs/cli-reference.md) |
-| Every `settings.ini` key | [docs/configuration-reference.md](docs/configuration-reference.md) |
-| Build outputs and scripts | [docs/build-and-deployment.md](docs/build-and-deployment.md) |
-| Screenshot filenames | [docs/images/PLACEHOLDER.md](docs/images/PLACEHOLDER.md) |
+| Shortcut | Action |
+|----------|--------|
+| `F5` | Refresh process list |
+| `Ctrl+F` | Focus process search |
+| `Ctrl+L` | Focus log filter |
+| `Ctrl+K` | Command palette |
+| `Enter` | Inject (Injection tab) |
+| `Up` / `Down` | Move selection in process list |
 
 ---
 
-## Requirements and build
+## Error codes (quick reference)
 
-- **OS:** Windows 10/11 x64
-- **IDE:** Visual Studio 2022 with Desktop development C++ workload
-- **Platform:** x64 only (Release recommended)
-- **Output directory:** `bin\Release\x64\`
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `0x1000` | Process not found or blocked by safety rules |
+| `0x1003` | Cannot open target process (try Admin) |
+| `0x1017` | Loader timed out in target |
+| `0x101A0001`..`5` | Loader failed inside target (see engine doc) |
 
-```
-manual_map.sln
-  ├── manual_map_core   → manual_map_core.lib
-  ├── manual_map        → manual_map.exe
-  ├── manual_map_gui    → manual_map_gui.exe
-  └── payload_dll       → payload_dll.dll
-```
-
-See [docs/build-and-deployment.md](docs/build-and-deployment.md) for step-by-step build, admin elevation, and commit scripts.
+Full table: [docs/manual-map-engine.md](docs/manual-map-engine.md#error-code-table-injector-side).
 
 ---
 
-## Security and responsibility
+## Security notice
 
-This software manipulates live process memory. It is intended for **local debugging, research, and authorized testing** on systems you own or have explicit permission to test. Many games and commercial applications prohibit injection; using this tool against them may violate terms of service or law. Run elevated only when required, keep allowlist/blocklist rules enabled in production-like environments, and never inject untrusted DLLs.
+Process memory injection is powerful and dangerous on untrusted targets. Use only on machines and processes you are authorized to test. Keep **Safety** rules configured in Settings. Never inject DLLs from untrusted sources.
 
 ---
 
-## License and attribution
+## Third-party
 
-ImGui is bundled under its own license in `manual_map/third_party/imgui/`. Application source in `manual_map/src/` and `payload_dll/` is part of this repository; refer to repository license terms if present.
+Dear ImGui is vendored at `manual_map/third_party/imgui/` under its own license. The GUI uses the Win32 and DirectX 11 backends.
 
-For questions about a specific module, open the linked doc in `docs/` and search for the source filename cited in that section.
+---
+
+## For new contributors
+
+1. Read [docs/architecture.md](docs/architecture.md) for the module map.
+2. Trace one inject from `gui_state.cpp` → `inject_service.cpp` → `manual_map.cpp`.
+3. Read loader status progression in [docs/manual-map-engine.md](docs/manual-map-engine.md).
+4. Test with `payload_dll.dll` into Notepad before touching protected targets.
+5. Use `%APPDATA%\manual_map\settings.ini` and the log panel for debugging.
+
+Questions about a specific file: open the matching doc above and search for the filename.
