@@ -40,6 +40,8 @@ namespace
             return false;
         }
 
+        SetLastError( ERROR_SUCCESS );
+
         if ( set_affinity( hwnd , affinity ) )
         {
             return true;
@@ -56,32 +58,7 @@ namespace
 
 bool capture_stealth_supported( )
 {
-    if ( !resolve_set_window_display_affinity( ) )
-    {
-        return false;
-    }
-
-    OSVERSIONINFOEXW version {};
-    version.dwOSVersionInfoSize = sizeof( version );
-#pragma warning( push )
-#pragma warning( disable : 4996 )
-    if ( !GetVersionExW( reinterpret_cast< OSVERSIONINFOW* >( &version ) ) )
-#pragma warning( pop )
-    {
-        return true;
-    }
-
-    if ( version.dwMajorVersion > 10 )
-    {
-        return true;
-    }
-
-    if ( version.dwMajorVersion == 10 && version.dwBuildNumber >= 19041 )
-    {
-        return true;
-    }
-
-    return false;
+    return resolve_set_window_display_affinity( ) != nullptr;
 }
 
 bool apply_capture_stealth( void* hwnd , bool enabled , std::wstring* error_out )
@@ -91,6 +68,16 @@ bool apply_capture_stealth( void* hwnd , bool enabled , std::wstring* error_out 
         if ( error_out )
         {
             *error_out = L"No window handle.";
+        }
+
+        return false;
+    }
+
+    if ( !capture_stealth_supported( ) )
+    {
+        if ( error_out )
+        {
+            *error_out = L"SetWindowDisplayAffinity is not available on this system.";
         }
 
         return false;
@@ -108,14 +95,17 @@ bool apply_capture_stealth( void* hwnd , bool enabled , std::wstring* error_out 
         return true;
     }
 
+    std::wstring exclude_error;
+    apply_affinity( window , WDA_EXCLUDEFROMCAPTURE , &exclude_error );
+
     if ( apply_affinity( window , WDA_MONITOR , error_out ) )
     {
-        if ( error_out )
-        {
-            error_out->clear( );
-        }
-
         return true;
+    }
+
+    if ( error_out && error_out->empty( ) && !exclude_error.empty( ) )
+    {
+        *error_out = exclude_error;
     }
 
     return false;

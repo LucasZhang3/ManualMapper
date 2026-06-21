@@ -741,27 +741,34 @@ namespace
         const float height = ImGui::GetFrameHeight( );
         const float width = height * 2.0f;
         const float radius = height * 0.5f;
-        const ImVec2 pos = ImGui::GetCursorScreenPos( );
 
         if ( !supported )
         {
             ImGui::BeginDisabled( );
         }
 
-        ImGui::InvisibleButton( "##stealth_toggle" , ImVec2( width , height ) );
+        ImGui::PushID( "stealth_toggle" );
+        ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 1 , 1 , 1 , 0.06f ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , 0.10f ) );
+        const bool pressed = ImGui::Button( "##stealth_toggle" , ImVec2( width , height ) );
+        ImGui::PopStyleColor( 3 );
 
-        if ( supported && ImGui::IsItemClicked( ) )
+        if ( pressed )
         {
             set_stealth_capture( state , !state.stealth_capture );
         }
 
+        const ImVec2 min = ImGui::GetItemRectMin( );
+        const ImVec2 max = ImGui::GetItemRectMax( );
         ImDrawList* draw = ImGui::GetWindowDrawList( );
         const ImU32 track = ImGui::GetColorU32(
             state.stealth_capture ? ImVec4( 0.45f , 0.20f , 0.75f , 1.0f ) : ImVec4( 0.22f , 0.24f , 0.30f , 1.0f ) );
-        draw->AddRectFilled( pos , ImVec2( pos.x + width , pos.y + height ) , track , radius );
+        draw->AddRectFilled( min , max , track , radius );
 
-        const float knob_x = pos.x + radius + ( state.stealth_capture ? ( width - radius * 2.0f ) : 0.0f );
-        draw->AddCircleFilled( ImVec2( knob_x , pos.y + radius ) , radius - 3.0f , IM_COL32( 255 , 255 , 255 , 255 ) );
+        const float knob_x = min.x + radius + ( state.stealth_capture ? ( max.x - min.x - radius * 2.0f ) : 0.0f );
+        draw->AddCircleFilled( ImVec2( knob_x , min.y + radius ) , radius - 3.0f , IM_COL32( 255 , 255 , 255 , 255 ) );
+        ImGui::PopID( );
 
         ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
         ImGui::AlignTextToFramePadding( );
@@ -770,8 +777,8 @@ namespace
             "Capture visibility for Discord, OBS, and similar tools.\n\n"
             "Stealth ON uses SetWindowDisplayAffinity so the window stays visible on your monitor "
             "but is excluded from most screen capture.\n\n"
-            "Run the injector as Administrator for best results with protected targets and capture APIs. "
-            "Requires Windows 10 version 2004 or later." );
+            "Run the injector as Administrator if enabling stealth fails. "
+            "Windows 10 version 2004 or later is recommended for full exclusion support." );
 
         if ( !supported )
         {
