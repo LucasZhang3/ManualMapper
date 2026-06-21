@@ -17,6 +17,7 @@ struct app_config
     bool confirm_inject = true;
     bool log_timestamps = true;
     bool use_allowlist = false;
+    bool stealth_capture = false;
     std::vector< std::wstring > process_rules;
     std::wstring cli_notes;
     std::wstring language = L"en";

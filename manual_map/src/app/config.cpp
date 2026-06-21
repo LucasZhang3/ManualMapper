@@ -137,6 +137,10 @@ namespace
         {
             config.log_timestamps = parse_bool( value , config.log_timestamps );
         }
+        else if ( key == L"stealth_capture" )
+        {
+            config.stealth_capture = parse_bool( value , config.stealth_capture );
+        }
         else if ( key == L"use_allowlist" )
         {
             config.use_allowlist = parse_bool( value , config.use_allowlist );
@@ -199,6 +203,7 @@ namespace
         file << L"panel_split=" << config.panel_split << L"\n";
         file << L"confirm_inject=" << ( config.confirm_inject ? L"1" : L"0" ) << L"\n";
         file << L"log_timestamps=" << ( config.log_timestamps ? L"1" : L"0" ) << L"\n";
+        file << L"stealth_capture=" << ( config.stealth_capture ? L"1" : L"0" ) << L"\n";
         file << L"use_allowlist=" << ( config.use_allowlist ? L"1" : L"0" ) << L"\n";
         file << L"cli_notes=" << config.cli_notes << L"\n";
         file << L"language=" << config.language << L"\n";

@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "gui_state.hpp"
+#include "window_stealth.hpp"
 
 #include <app/errors.hpp>
 
@@ -679,6 +680,84 @@ namespace
         ImGui::TextUnformatted( state.light_mode ? "Light" : "Dark" );
     }
 
+    bool set_stealth_capture( gui_app_state& state , bool enabled )
+    {
+        std::wstring error;
+        const bool applied = apply_capture_stealth( g_gui_hwnd , enabled , &error );
+
+        if ( !applied )
+        {
+            append_log(
+                state ,
+                "Stealth capture failed: "
+                + ( error.empty( ) ? std::string( "unknown error" ) : wide_to_utf8( error ) ) );
+            return false;
+        }
+
+        state.stealth_capture = enabled;
+        state.config.stealth_capture = enabled;
+        save_config( state.config );
+
+        append_log(
+            state ,
+            enabled
+                ? "[stealth] Window hidden from Discord/OBS capture (SetWindowDisplayAffinity)."
+                : "[stealth] Window visible to Discord/OBS capture again." );
+
+        return true;
+    }
+
+    void draw_stealth_toggle( gui_app_state& state )
+    {
+        const bool supported = capture_stealth_supported( );
+        ImGuiStyle& style = ImGui::GetStyle( );
+        const float height = ImGui::GetFrameHeight( );
+        const float width = height * 2.0f;
+        const float radius = height * 0.5f;
+        const ImVec2 pos = ImGui::GetCursorScreenPos( );
+
+        if ( !supported )
+        {
+            ImGui::BeginDisabled( );
+        }
+
+        ImGui::InvisibleButton( "##stealth_toggle" , ImVec2( width , height ) );
+
+        if ( supported && ImGui::IsItemClicked( ) )
+        {
+            set_stealth_capture( state , !state.stealth_capture );
+        }
+
+        if ( !supported && ImGui::IsItemHovered( ) )
+        {
+            ImGui::SetTooltip( "Capture stealth requires Windows 10 version 2004 or later." );
+        }
+        else if ( ImGui::IsItemHovered( ) )
+        {
+            ImGui::SetTooltip(
+                state.stealth_capture
+                    ? "Stealth ON: window is hidden from Discord, OBS, and similar capture tools."
+                    : "Stealth OFF: window appears in Discord, OBS, and similar capture tools." );
+        }
+
+        ImDrawList* draw = ImGui::GetWindowDrawList( );
+        const ImU32 track = ImGui::GetColorU32(
+            state.stealth_capture ? ImVec4( 0.45f , 0.20f , 0.75f , 1.0f ) : ImVec4( 0.22f , 0.24f , 0.30f , 1.0f ) );
+        draw->AddRectFilled( pos , ImVec2( pos.x + width , pos.y + height ) , track , radius );
+
+        const float knob_x = pos.x + radius + ( state.stealth_capture ? ( width - radius * 2.0f ) : 0.0f );
+        draw->AddCircleFilled( ImVec2( knob_x , pos.y + radius ) , radius - 3.0f , IM_COL32( 255 , 255 , 255 , 255 ) );
+
+        ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
+        ImGui::AlignTextToFramePadding( );
+        ImGui::TextUnformatted( state.stealth_capture ? "Stealth" : "Visible" );
+
+        if ( !supported )
+        {
+            ImGui::EndDisabled( );
+        }
+    }
+
     void draw_recent_dll_cards( gui_app_state& state )
     {
         if ( state.config.recent_dlls.empty( ) )
@@ -813,6 +892,20 @@ namespace
         {
             ImGui::Checkbox( "Confirm before inject" , &state.confirm_inject );
             ImGui::Checkbox( "Log timestamps" , &state.log_timestamps );
+
+            if ( ImGui::Checkbox( "Stealth (hide from Discord/OBS capture)" , &state.stealth_capture ) )
+            {
+                if ( !set_stealth_capture( state , state.stealth_capture ) )
+                {
+                    state.stealth_capture = !state.stealth_capture;
+                }
+            }
+
+            if ( ImGui::IsItemHovered( ) )
+            {
+                ImGui::SetTooltip( "Uses SetWindowDisplayAffinity so the window stays visible to you but not in screen capture." );
+            }
+
             ImGui::Checkbox( "Allowlist mode (off = blocklist)" , &state.use_allowlist );
             state.config.confirm_inject = state.confirm_inject;
             state.config.log_timestamps = state.log_timestamps;
@@ -994,6 +1087,7 @@ void gui_state_init( gui_app_state& state )
     state.log_timestamps = state.config.log_timestamps;
     state.use_allowlist = state.config.use_allowlist;
     state.panel_split = state.config.panel_split;
+    state.stealth_capture = state.config.stealth_capture;
     std::strncpy( state.cli_notes , wide_to_utf8( state.config.cli_notes ).c_str( ) , sizeof( state.cli_notes ) - 1 );
 
     std::wstring rules;
@@ -1019,6 +1113,15 @@ void gui_state_init( gui_app_state& state )
     apply_theme( state.light_mode );
     refresh_processes( state );
     append_log( state , "Manual Map Injector ready." );
+
+    if ( state.stealth_capture )
+    {
+        if ( !set_stealth_capture( state , true ) )
+        {
+            state.stealth_capture = false;
+            state.config.stealth_capture = false;
+        }
+    }
 
     if ( !is_process_elevated( ) )
     {
@@ -1103,6 +1206,8 @@ void gui_state_render( gui_app_state& state )
         }
     }
 
+    ImGui::SameLine( io.DisplaySize.x - 270.0f );
+    draw_stealth_toggle( state );
     ImGui::SameLine( io.DisplaySize.x - 130.0f );
     draw_theme_toggle( state );
 

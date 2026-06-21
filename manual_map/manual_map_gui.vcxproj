@@ -95,6 +95,7 @@
     <ClCompile Include="src\gui\main.cpp" />
     <ClCompile Include="src\gui\gui_app.cpp" />
     <ClCompile Include="src\gui\gui_state.cpp" />
+    <ClCompile Include="src\gui\window_stealth.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
@@ -105,6 +106,7 @@
   <ItemGroup>
     <ClInclude Include="src\gui\gui_app.hpp" />
     <ClInclude Include="src\gui\gui_state.hpp" />
+    <ClInclude Include="src\gui\window_stealth.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="manual_map_core.vcxproj">

@@ -31,6 +31,7 @@ struct gui_app_state
     bool show_settings = false;
     bool show_confirm_popup = false;
     bool light_mode = false;
+    bool stealth_capture = false;
 
     int selected_pid = 0;
     int list_focus = -1;
