@@ -60,7 +60,9 @@ This repository is intended for **local debugging, security research, and author
 - GUI status bar: **Injection succeeded (payload verified)**.
 - Output log contains `[payload] Handshake confirmed` lines.
 
-![Inject success in target process](docs/images/06-inject-success-popup.png)
+<p align="center">
+  <img src="docs/images/06-inject-success-popup.png" alt="Inject success in target process" width="420" />
+</p>
 
 ---
 
@@ -68,15 +70,21 @@ This repository is intended for **local debugging, security research, and author
 
 ### Application shell
 
-| Injection tab (full window) | Tab bar |
-|:---:|:---:|
-| ![Main window](docs/images/01-main-window-injection.png) | ![Tabs](docs/images/02-tab-bar.png) |
-| Target + payload + log layout | Title bar and three tabs |
+<p align="center">
+  <img src="docs/images/01-main-window-injection.png" alt="Main window on Injection tab" width="100%" />
+</p>
 
-| Status bar | History tab |
+*Full window on the Injection tab: target list, payload panel, output log, and action buttons.*
+
+| Tab bar | Status bar |
 |:---:|:---:|
-| ![Status bar](docs/images/07-status-bar.png) | ![History](docs/images/08-history-tab.png) |
-| Ready text, target, Admin/Standard | Re-inject and Clear History |
+| ![Tabs](docs/images/02-tab-bar.png) | ![Status bar](docs/images/07-status-bar.png) |
+| Title bar and three tabs | Ready text, target, Admin/Standard |
+
+| History tab |
+|:---:|
+| ![History](docs/images/08-history-tab.png) |
+| Re-inject and Clear History |
 
 ### Injection tab details
 
