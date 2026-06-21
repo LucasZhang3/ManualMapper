@@ -21,6 +21,10 @@ namespace
 {
     bool set_stealth_capture( gui_app_state& state , bool enabled );
 
+    POINT g_title_drag_anchor {};
+    RECT g_title_drag_window {};
+    bool g_title_dragging = false;
+
     std::string wide_to_utf8_local( const std::wstring& text )
     {
         if ( text.empty( ) )
@@ -57,6 +61,41 @@ namespace
         return true;
     }
 
+    void handle_title_drag( void* hwnd )
+    {
+        const HWND window = static_cast< HWND >( hwnd );
+
+        if ( ImGui::IsItemActivated( ) )
+        {
+            GetCursorPos( &g_title_drag_anchor );
+            GetWindowRect( window , &g_title_drag_window );
+            g_title_dragging = true;
+        }
+
+        if ( !ImGui::IsItemActive( ) )
+        {
+            g_title_dragging = false;
+            return;
+        }
+
+        if ( !g_title_dragging || !ImGui::IsMouseDragging( ImGuiMouseButton_Left ) )
+        {
+            return;
+        }
+
+        POINT cursor {};
+        GetCursorPos( &cursor );
+        const int delta_x = cursor.x - g_title_drag_anchor.x;
+        const int delta_y = cursor.y - g_title_drag_anchor.y;
+        SetWindowPos(
+            window ,
+            nullptr ,
+            g_title_drag_window.left + delta_x ,
+            g_title_drag_window.top + delta_y ,
+            0 ,
+            0 ,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE );
+    }
 }
 
 void gui_push_toast( gui_app_state& state , const char* message , toast_type type )
@@ -181,7 +220,7 @@ bool gui_begin_section_card( const char* id , const char* title , bool default_o
 {
     ImGui::PushStyleVar( ImGuiStyleVar_ChildRounding , 6.0f );
     ImGui::PushStyleColor( ImGuiCol_ChildBg , ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
-    ImGui::BeginChild( id , ImVec2( -1.0f , 0.0f ) , ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize );
+    ImGui::BeginChild( id , ImVec2( -1.0f , 0.0f ) , ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize , gui_child_scroll_flags( ) );
 
     if ( open_state )
     {
@@ -221,110 +260,108 @@ void gui_draw_title_bar( gui_app_state& state , void* hwnd )
 {
     const auto& tokens = gui_theme_tokens_for( state );
     const HWND window = static_cast< HWND >( hwnd );
-    const float bar_h = tokens.title_bar_height - 6.0f;
+    const float bar_h = tokens.title_bar_height - 4.0f;
     const float btn_w = 46.0f;
     const float buttons_w = btn_w * 3.0f;
-    const float total_w = ImGui::GetContentRegionAvail( ).x;
-    const ImVec2 row_start = ImGui::GetCursorScreenPos( );
 
-    ImDrawList* draw = ImGui::GetWindowDrawList( );
-
-    float label_x = row_start.x + 10.0f;
-    const float icon_size = bar_h - 4.0f;
-
-    if ( state.app_icon_texture )
+    if ( !ImGui::BeginTable( "##titlebar_layout" , 2 , ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_NoPadOuterX ) )
     {
-        draw->AddImage(
-            state.app_icon_texture ,
-            ImVec2( label_x , row_start.y + 2.0f ) ,
-            ImVec2( label_x + icon_size , row_start.y + 2.0f + icon_size ) );
-        label_x += icon_size + 8.0f;
+        return;
     }
 
-    if ( state.font_header )
+    ImGui::TableSetupColumn( "TitleArea" , ImGuiTableColumnFlags_WidthStretch );
+    ImGui::TableSetupColumn( "WindowButtons" , ImGuiTableColumnFlags_WidthFixed , buttons_w );
+    ImGui::TableNextRow( ImGuiTableRowFlags_None , bar_h );
+
+    ImGui::TableSetColumnIndex( 0 );
     {
-        ImGui::PushFont( state.font_header );
-    }
+        const ImVec2 cell_min = ImGui::GetCursorScreenPos( );
+        ImDrawList* draw = ImGui::GetWindowDrawList( );
+        float label_x = cell_min.x + 8.0f;
+        const float icon_size = bar_h - 6.0f;
 
-    draw->AddText(
-        ImVec2( label_x , row_start.y + ( bar_h - ImGui::GetTextLineHeight( ) ) * 0.5f ) ,
-        ImGui::GetColorU32( ImGuiCol_Text ) ,
-        "Manual Map Injector" );
-
-    if ( state.font_header )
-    {
-        ImGui::PopFont( );
-    }
-
-    ImGui::SetCursorScreenPos( row_start );
-    ImGui::InvisibleButton( "##title_drag" , ImVec2( ( std::max )( 0.0f , total_w - buttons_w ) , bar_h ) );
-
-    if ( ImGui::IsItemActive( ) && ImGui::IsMouseDragging( ImGuiMouseButton_Left ) )
-    {
-        ReleaseCapture( );
-        SendMessageW( window , WM_NCLBUTTONDOWN , HTCAPTION , 0 );
-    }
-
-    ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
-    ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , 0.10f ) );
-    ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 1 , 1 , 1 , 0.08f ) );
-
-    ImGui::SetCursorScreenPos( ImVec2( row_start.x + total_w - buttons_w , row_start.y ) );
-
-    if ( ImGui::Button( "##min" , ImVec2( btn_w , bar_h ) ) )
-    {
-        if ( state.config.min_to_tray )
+        if ( state.app_icon_texture )
         {
-            gui_tray_minimize_to_tray( hwnd );
+            draw->AddImage(
+                state.app_icon_texture ,
+                ImVec2( label_x , cell_min.y + 3.0f ) ,
+                ImVec2( label_x + icon_size , cell_min.y + 3.0f + icon_size ) );
+            label_x += icon_size + 8.0f;
         }
-        else
+
+        if ( state.font_header )
         {
-            ShowWindow( window , SW_MINIMIZE );
+            ImGui::PushFont( state.font_header );
         }
+
+        draw->AddText(
+            ImVec2( label_x , cell_min.y + ( bar_h - ImGui::GetTextLineHeight( ) ) * 0.5f ) ,
+            ImGui::GetColorU32( ImGuiCol_Text ) ,
+            "Manual Map Injector" );
+
+        if ( state.font_header )
+        {
+            ImGui::PopFont( );
+        }
+
+        ImGui::SetCursorScreenPos( cell_min );
+        ImGui::InvisibleButton( "##title_drag" , ImVec2( ImGui::GetContentRegionAvail( ).x , bar_h ) );
+        handle_title_drag( hwnd );
     }
 
-    ImGui::SameLine( 0.0f , 0.0f );
-
-    if ( ImGui::Button( state.window_maximized ? "##restore" : "##max" , ImVec2( btn_w , bar_h ) ) )
+    ImGui::TableSetColumnIndex( 1 );
     {
-        if ( state.window_maximized )
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing , ImVec2( 0.0f , 0.0f ) );
+        ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , 0.10f ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 1 , 1 , 1 , 0.08f ) );
+
+        if ( ImGui::Button( "-" , ImVec2( btn_w , bar_h ) ) )
         {
-            ShowWindow( window , SW_RESTORE );
-            state.window_maximized = false;
+            if ( state.config.min_to_tray )
+            {
+                gui_tray_minimize_to_tray( hwnd );
+            }
+            else
+            {
+                ShowWindow( window , SW_MINIMIZE );
+            }
         }
-        else
+
+        ImGui::SameLine( 0.0f , 0.0f );
+
+        if ( ImGui::Button( state.window_maximized ? "R" : "[]" , ImVec2( btn_w , bar_h ) ) )
         {
-            ShowWindow( window , SW_MAXIMIZE );
-            state.window_maximized = true;
+            if ( state.window_maximized )
+            {
+                ShowWindow( window , SW_RESTORE );
+                state.window_maximized = false;
+            }
+            else
+            {
+                ShowWindow( window , SW_MAXIMIZE );
+                state.window_maximized = true;
+            }
         }
+
+        ImGui::SameLine( 0.0f , 0.0f );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 0.85f , 0.20f , 0.20f , 0.85f ) );
+
+        if ( ImGui::Button( "X" , ImVec2( btn_w , bar_h ) ) )
+        {
+            PostMessageW( window , WM_CLOSE , 0 , 0 );
+        }
+
+        ImGui::PopStyleColor( 4 );
+        ImGui::PopStyleVar( );
     }
 
-    ImGui::SameLine( 0.0f , 0.0f );
-    ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 0.85f , 0.20f , 0.20f , 0.85f ) );
-
-    if ( ImGui::Button( "##close" , ImVec2( btn_w , bar_h ) ) )
-    {
-        PostMessageW( window , WM_CLOSE , 0 , 0 );
-    }
-
-    ImGui::PopStyleColor( 4 );
-
-    const ImVec2 btn_min( row_start.x + total_w - buttons_w , row_start.y );
-    const float glyph_y = row_start.y + ( bar_h - ImGui::GetTextLineHeight( ) ) * 0.5f;
-    const ImU32 glyph = ImGui::GetColorU32( ImGuiCol_Text );
-    draw->AddText( ImVec2( btn_min.x + 18.0f , glyph_y ) , glyph , "-" );
-    draw->AddText( ImVec2( btn_min.x + btn_w + 14.0f , glyph_y ) , glyph , state.window_maximized ? "R" : "[]" );
-    draw->AddText( ImVec2( btn_min.x + btn_w * 2.0f + 16.0f , glyph_y ) , glyph , "X" );
+    ImGui::EndTable( );
 }
 
 void gui_draw_status_bar( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
-    const ImGuiIO& io = ImGui::GetIO( );
-    const ImVec2 bar_min( 0.0f , io.DisplaySize.y - tokens.status_bar_height );
-    const ImVec2 bar_max( io.DisplaySize.x , io.DisplaySize.y );
-    ImDrawList* draw = ImGui::GetForegroundDrawList( );
-    draw->AddRectFilled( bar_min , bar_max , ImGui::GetColorU32( state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.07f , 0.07f , 0.08f , 1.0f ) ) );
 
     std::string target = "No target";
 
@@ -345,10 +382,13 @@ void gui_draw_status_bar( gui_app_state& state )
     }
 
     const bool elevated = is_process_elevated( );
-    const float y = bar_min.y + ( tokens.status_bar_height - ImGui::GetTextLineHeight( ) ) * 0.5f;
-    draw->AddText( ImVec2( 12.0f , y ) , ImGui::GetColorU32( ImGuiCol_Text ) , state.status.c_str( ) );
-    draw->AddText( ImVec2( io.DisplaySize.x * 0.35f , y ) , ImGui::GetColorU32( ImGuiCol_TextDisabled ) , target.c_str( ) );
-    draw->AddText( ImVec2( io.DisplaySize.x - 120.0f , y ) , ImGui::GetColorU32( elevated ? gui_theme_accent( state.config.accent_index ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ) , elevated ? "Admin" : "Standard" );
+    ImGui::AlignTextToFramePadding( );
+    ImGui::TextUnformatted( state.status.c_str( ) );
+    ImGui::SameLine( ImGui::GetWindowWidth( ) * 0.32f );
+    ImGui::TextDisabled( "%s" , target.c_str( ) );
+    ImGui::SameLine( ImGui::GetWindowWidth( ) - 110.0f );
+    ImGui::TextColored( elevated ? gui_theme_accent( state.config.accent_index ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) , elevated ? "Admin" : "Standard" );
+    ( void )tokens;
 }
 
 void gui_draw_sidebar( gui_app_state& state )

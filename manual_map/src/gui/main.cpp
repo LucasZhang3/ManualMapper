@@ -53,19 +53,6 @@ namespace
 
         if ( point.y < static_cast< LONG >( title_h ) )
         {
-            if ( point.y < border )
-            {
-                if ( point.x < border )
-                {
-                    return HTTOPLEFT;
-                }
-
-                if ( point.x >= client_rect.right - border )
-                {
-                    return HTTOPRIGHT;
-                }
-            }
-
             return HTCLIENT;
         }
 

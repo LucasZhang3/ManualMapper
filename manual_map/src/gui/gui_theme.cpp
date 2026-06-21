@@ -84,6 +84,8 @@ void gui_theme_apply( gui_app_state& state )
     style.FramePadding = ImVec2( 8.0f , state.config.compact_mode ? 4.0f : 5.0f );
     style.WindowBorderSize = 0.0f;
     style.ChildBorderSize = 0.0f;
+    style.ScrollbarSize = 0.0f;
+    style.ScrollbarRounding = 0.0f;
 
     ImVec4* style_colors = style.Colors;
 

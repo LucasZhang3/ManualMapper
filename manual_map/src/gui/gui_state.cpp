@@ -649,7 +649,7 @@ namespace
     void draw_process_list( gui_app_state& state , const std::vector< process_entry >& visible , float height )
     {
         const auto& tokens = gui_theme_tokens_for( state );
-        ImGui::BeginChild( "ProcessList" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "ProcessList" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
 
         const float content_width = ImGui::GetContentRegionAvail( ).x;
         const float row_height = tokens.row_height;
@@ -783,7 +783,7 @@ namespace
     void draw_injection_summary( gui_app_state& state )
     {
         ImGui::PushStyleColor( ImGuiCol_ChildBg , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
-        ImGui::BeginChild( "InjectSummary" , ImVec2( -1.0f , 88.0f ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "InjectSummary" , ImVec2( -1.0f , 88.0f ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
         ImGui::TextUnformatted( "Injection Summary" );
         ImGui::Text( "Target: %s" , state.selected_pid > 0 ? selected_process_label( state ).c_str( ) : ( state.search [ 0 ] ? state.search : "None" ) );
 
@@ -954,7 +954,7 @@ namespace
             log_copy = state.log;
         }
 
-        ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
 
         if ( state.font_mono )
         {
@@ -1008,10 +1008,14 @@ namespace
 
     void draw_injection_page( gui_app_state& state , ImGuiIO& io )
     {
-        const auto& tokens = gui_theme_tokens_for( state );
-        const float left_width = ( io.DisplaySize.x - tokens.sidebar_width ) * state.panel_split;
+        ( void )io;
+        const float content_w = ImGui::GetContentRegionAvail( ).x;
+        const float content_h = ImGui::GetContentRegionAvail( ).y;
+        const float action_row_h = 44.0f;
+        const float panels_h = ( std::max )( 120.0f , content_h - action_row_h );
+        const float left_width = ( std::max )( 220.0f , content_w * state.panel_split );
 
-        ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , -tokens.status_bar_height - 52.0f ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , panels_h ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
         draw_injection_summary( state );
 
         if ( gui_begin_section_card( "TargetCard" , "Target Process" , true , nullptr ) )
@@ -1051,7 +1055,7 @@ namespace
             draw_favorites_strip( state );
             const auto visible = visible_processes( state );
             ImGui::TextDisabled( "%d process(es) shown" , static_cast< int >( visible.size( ) ) );
-            draw_process_list( state , visible , io.DisplaySize.y * 0.28f );
+            draw_process_list( state , visible , ( std::max )( 120.0f , ImGui::GetContentRegionAvail( ).y * 0.55f ) );
             gui_end_section_card( );
         }
 
@@ -1087,12 +1091,11 @@ namespace
         ImGui::EndChild( );
 
         ImGui::SameLine( );
-        ImGui::InvisibleButton( "##splitter" , ImVec2( 4.0f , -tokens.status_bar_height - 52.0f ) );
+        ImGui::InvisibleButton( "##splitter" , ImVec2( 4.0f , panels_h ) );
 
         if ( ImGui::IsItemActive( ) )
         {
-            const float total = io.DisplaySize.x - tokens.sidebar_width;
-            state.panel_split = ( std::clamp )( state.panel_split + io.MouseDelta.x / total , 0.28f , 0.62f );
+            state.panel_split = ( std::clamp )( state.panel_split + ImGui::GetIO( ).MouseDelta.x / content_w , 0.28f , 0.72f );
             state.config.panel_split = state.panel_split;
         }
 
@@ -1102,7 +1105,7 @@ namespace
         }
 
         ImGui::SameLine( );
-        ImGui::BeginChild( "RightPanel" , ImVec2( 0.0f , -tokens.status_bar_height - 52.0f ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "RightPanel" , ImVec2( 0.0f , panels_h ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
         draw_log_panel( state , ImGui::GetContentRegionAvail( ).y );
         ImGui::EndChild( );
 
@@ -1159,8 +1162,7 @@ namespace
 
     void draw_history_page( gui_app_state& state )
     {
-        const auto& tokens = gui_theme_tokens_for( state );
-        ImGui::BeginChild( "HistoryPage" , ImVec2( 0.0f , -tokens.status_bar_height ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "HistoryPage" , ImVec2( -1.0f , ImGui::GetContentRegionAvail( ).y ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
         ImGui::TextUnformatted( "Injection History" );
         ImGui::Separator( );
 
@@ -1219,8 +1221,7 @@ namespace
 
     void draw_settings_page( gui_app_state& state )
     {
-        const auto& tokens = gui_theme_tokens_for( state );
-        ImGui::BeginChild( "SettingsScroll" , ImVec2( 0.0f , -tokens.status_bar_height ) , ImGuiChildFlags_None );
+        ImGui::BeginChild( "SettingsScroll" , ImVec2( -1.0f , ImGui::GetContentRegionAvail( ).y ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
 
         if ( gui_begin_section_card( "AppearanceSection" , "Appearance" , true , &state.config.settings_appearance_open ) )
         {
@@ -1738,51 +1739,68 @@ void gui_state_render( gui_app_state& state )
     ImGui::Begin(
         "ManualMapInjector" ,
         nullptr ,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus );
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar );
 
     const ImVec4 title_bg = state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f );
     const ImVec4 sidebar_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
+    const ImVec4 status_bg = state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.07f , 0.07f , 0.08f , 1.0f );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 3.0f ) );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 2.0f ) );
     ImGui::PushStyleColor( ImGuiCol_ChildBg , title_bg );
-    ImGui::BeginChild( "TitleBar" , ImVec2( 0.0f , tokens.title_bar_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
+    ImGui::BeginChild( "TitleBar" , ImVec2( 0.0f , tokens.title_bar_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
     gui_draw_title_bar( state , g_gui_hwnd );
     ImGui::EndChild( );
     ImGui::PopStyleColor( );
     ImGui::PopStyleVar( );
 
-    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
+    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
 
-    ImGui::PushStyleColor( ImGuiCol_ChildBg , sidebar_bg );
-    ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
-    gui_draw_sidebar( state );
-    ImGui::EndChild( );
-    ImGui::PopStyleColor( );
-
-    ImGui::SameLine( 0.0f , 0.0f );
-
-    ImGui::BeginChild( "MainContent" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
-
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
-
-    switch ( state.current_page )
+    if ( ImGui::BeginTable( "##shell_layout" , 2 , ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoBordersInBody ) )
     {
-    case gui_page::injection:
-        draw_injection_page( state , io );
-        break;
-    case gui_page::history:
-        draw_history_page( state );
-        break;
-    case gui_page::settings:
-        draw_settings_page( state );
-        break;
+        ImGui::TableSetupColumn( "Nav" , ImGuiTableColumnFlags_WidthFixed , tokens.sidebar_width );
+        ImGui::TableSetupColumn( "Page" , ImGuiTableColumnFlags_WidthStretch );
+        ImGui::TableNextRow( ImGuiTableRowFlags_None , body_height );
+
+        ImGui::TableSetColumnIndex( 0 );
+        ImGui::PushStyleColor( ImGuiCol_ChildBg , sidebar_bg );
+        ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        gui_draw_sidebar( state );
+        ImGui::EndChild( );
+        ImGui::PopStyleColor( );
+
+        ImGui::TableSetColumnIndex( 1 );
+        ImGui::BeginChild( "MainContent" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
+
+        switch ( state.current_page )
+        {
+        case gui_page::injection:
+            draw_injection_page( state , io );
+            break;
+        case gui_page::history:
+            draw_history_page( state );
+            break;
+        case gui_page::settings:
+            draw_settings_page( state );
+            break;
+        }
+
+        ImGui::PopStyleVar( );
+        ImGui::EndChild( );
+
+        ImGui::EndTable( );
     }
 
-    ImGui::PopStyleVar( );
-    ImGui::EndChild( );
     ImGui::EndChild( );
 
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 12.0f , 4.0f ) );
+    ImGui::PushStyleColor( ImGuiCol_ChildBg , status_bg );
+    ImGui::BeginChild( "StatusBar" , ImVec2( 0.0f , tokens.status_bar_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
     gui_draw_status_bar( state );
+    ImGui::EndChild( );
+    ImGui::PopStyleColor( );
+    ImGui::PopStyleVar( );
+
     draw_confirm_popup( state );
     gui_draw_command_palette( state );
     gui_draw_first_run_wizard( state );
