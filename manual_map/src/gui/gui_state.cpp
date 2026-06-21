@@ -176,13 +176,218 @@ namespace
     {
         auto visible = filter_processes( state.all_processes , utf8_to_wide( state.search ).c_str( ) );
         sort_processes( visible , state.sort_mode );
+        return visible;
+    }
 
-        for ( auto& process : visible )
+    struct process_list_layout
+    {
+        float content_width = 0.0f;
+        float row_height = 0.0f;
+        float x [ 7 ] = {};
+        float w [ 7 ] = {};
+    };
+
+    process_list_layout build_process_list_layout( float content_width )
+    {
+        process_list_layout layout {};
+        const ImGuiStyle& style = ImGui::GetStyle( );
+        layout.content_width = content_width;
+        layout.row_height = ImGui::GetTextLineHeight( ) + style.CellPadding.y * 2.0f;
+
+        layout.w [ 0 ] = 18.0f;
+        layout.w [ 1 ] = 56.0f;
+        layout.w [ 3 ] = 34.0f;
+        layout.w [ 4 ] = 30.0f;
+        layout.w [ 5 ] = 34.0f;
+        layout.w [ 6 ] = 50.0f;
+
+        const float fixed =
+            layout.w [ 0 ] + layout.w [ 1 ] + layout.w [ 3 ] + layout.w [ 4 ] + layout.w [ 5 ] + layout.w [ 6 ];
+        layout.w [ 2 ] = ( std::max )( 96.0f , content_width - fixed );
+
+        float cursor = 0.0f;
+
+        for ( int column = 0; column < 7; ++column )
         {
-            enrich_process_details( process );
+            layout.x [ column ] = cursor;
+            cursor += layout.w [ column ];
         }
 
-        return visible;
+        return layout;
+    }
+
+    void draw_list_cell(
+        ImDrawList* draw ,
+        const ImVec2& row_min ,
+        float text_y ,
+        const process_list_layout& layout ,
+        int column ,
+        const char* text ,
+        bool right_align ,
+        ImU32 color )
+    {
+        if ( !text || !text [ 0 ] )
+        {
+            return;
+        }
+
+        const ImVec2 text_size = ImGui::CalcTextSize( text , nullptr , true );
+        const float cell_x = row_min.x + layout.x [ column ];
+        float draw_x = cell_x + 4.0f;
+
+        if ( right_align )
+        {
+            draw_x = cell_x + layout.w [ column ] - text_size.x - 4.0f;
+        }
+
+        const ImVec2 clip_min( cell_x , row_min.y );
+        const ImVec2 clip_max( cell_x + layout.w [ column ] , row_min.y + layout.row_height );
+        draw->PushClipRect( clip_min , clip_max , true );
+        draw->AddText( ImVec2( draw_x , text_y ) , color , text );
+        draw->PopClipRect( );
+    }
+
+    bool is_favorite( const gui_app_state& state , uint32_t pid );
+    void toggle_favorite( gui_app_state& state , uint32_t pid );
+    void start_injection( gui_app_state& state );
+
+    void draw_process_list( gui_app_state& state , const std::vector< process_entry >& visible , float height )
+    {
+        ImGui::BeginChild( "ProcessList" , ImVec2( -1.0f , height ) , ImGuiChildFlags_Border );
+
+        const float content_width = ImGui::GetContentRegionAvail( ).x;
+        const process_list_layout layout = build_process_list_layout( content_width );
+        ImDrawList* draw = ImGui::GetWindowDrawList( );
+        const ImU32 text_color = ImGui::GetColorU32( ImGuiCol_Text );
+        const ImU32 header_bg = ImGui::GetColorU32( ImGuiCol_TableHeaderBg );
+
+        const ImVec2 header_min = ImGui::GetCursorScreenPos( );
+        draw->AddRectFilled(
+            header_min ,
+            ImVec2( header_min.x + content_width , header_min.y + layout.row_height ) ,
+            header_bg );
+
+        const float header_text_y = header_min.y + ( layout.row_height - ImGui::GetTextLineHeight( ) ) * 0.5f;
+        static const char* headers [ ] = { "" , "PID" , "Process Name" , "Arch" , "Elev" , "Sess" , "PPID" };
+        static const bool header_right [ ] = { false , true , false , false , false , true , true };
+
+        for ( int column = 0; column < 7; ++column )
+        {
+            draw_list_cell( draw , header_min , header_text_y , layout , column , headers [ column ] , header_right [ column ] , text_color );
+        }
+
+        ImGui::Dummy( ImVec2( 0.0f , layout.row_height ) );
+
+        if ( visible.empty( ) )
+        {
+            ImGui::TextDisabled( "No matching processes." );
+            ImGui::EndChild( );
+            return;
+        }
+
+        ImGuiListClipper clipper;
+        clipper.Begin( static_cast< int >( visible.size( ) ) , layout.row_height );
+
+        while ( clipper.Step( ) )
+        {
+            for ( int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row )
+            {
+                process_entry process = visible [ static_cast< size_t >( row ) ];
+                enrich_process_details( process );
+
+                ImGui::PushID( process.pid );
+
+                const ImVec2 row_min = ImGui::GetCursorScreenPos( );
+                ImGui::InvisibleButton( "##row" , ImVec2( content_width , layout.row_height ) );
+
+                const bool hovered = ImGui::IsItemHovered( );
+                const bool clicked = ImGui::IsItemClicked( ImGuiMouseButton_Left );
+                const bool right_clicked = ImGui::IsItemClicked( ImGuiMouseButton_Right );
+                const bool double_clicked = hovered && ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left );
+                const ImVec2 item_min = ImGui::GetItemRectMin( );
+                const ImVec2 item_max = ImGui::GetItemRectMax( );
+                const bool selected = state.selected_pid == static_cast< int >( process.pid );
+                const bool focused = state.list_focus == row;
+
+                if ( selected )
+                {
+                    draw->AddRectFilled( item_min , item_max , ImGui::GetColorU32( ImGuiCol_Header ) );
+                }
+                else if ( focused || hovered )
+                {
+                    draw->AddRectFilled( item_min , item_max , ImGui::GetColorU32( ImGuiCol_HeaderHovered ) );
+                }
+                else if ( row % 2 == 1 )
+                {
+                    draw->AddRectFilled( item_min , item_max , ImGui::GetColorU32( ImGuiCol_TableRowBgAlt ) );
+                }
+
+                const float text_y = item_min.y + ( item_max.y - item_min.y - ImGui::GetTextLineHeight( ) ) * 0.5f;
+                const std::string name_utf8 = wide_to_utf8( process.name );
+                const std::string favorite = is_favorite( state , process.pid ) ? "*" : " ";
+                const std::string pid_text = std::to_string( process.pid );
+                const std::string arch = process.is_wow64 ? "x86" : "x64";
+                const std::string elev = process.is_elevated ? "Y" : "N";
+                const std::string sess = std::to_string( process.session_id );
+                const std::string ppid = std::to_string( process.parent_pid );
+
+                draw_list_cell( draw , item_min , text_y , layout , 0 , favorite.c_str( ) , false , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 1 , pid_text.c_str( ) , true , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 2 , name_utf8.c_str( ) , false , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 3 , arch.c_str( ) , false , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 4 , elev.c_str( ) , false , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 5 , sess.c_str( ) , true , text_color );
+                draw_list_cell( draw , item_min , text_y , layout , 6 , ppid.c_str( ) , true , text_color );
+
+                if ( clicked )
+                {
+                    state.list_focus = row;
+                    state.selected_pid = static_cast< int >( process.pid );
+                    std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
+                }
+
+                if ( right_clicked )
+                {
+                    toggle_favorite( state , process.pid );
+                }
+
+                if ( double_clicked )
+                {
+                    state.selected_pid = static_cast< int >( process.pid );
+                    std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
+                    start_injection( state );
+                }
+
+                ImGui::PopID( );
+            }
+        }
+
+        if ( ImGui::IsWindowFocused( ImGuiFocusedFlags_ChildWindows ) && !ImGui::IsAnyItemActive( ) )
+        {
+            if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) && state.list_focus > 0 )
+            {
+                --state.list_focus;
+            }
+
+            if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) && state.list_focus + 1 < static_cast< int >( visible.size( ) ) )
+            {
+                ++state.list_focus;
+            }
+
+            if ( state.list_focus >= 0 && state.list_focus < static_cast< int >( visible.size( ) ) )
+            {
+                const auto& focused_process = visible [ static_cast< size_t >( state.list_focus ) ];
+                state.selected_pid = static_cast< int >( focused_process.pid );
+                std::strncpy( state.search , wide_to_utf8( focused_process.name ).c_str( ) , sizeof( state.search ) - 1 );
+
+                if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
+                {
+                    start_injection( state );
+                }
+            }
+        }
+
+        ImGui::EndChild( );
     }
 
     bool is_favorite( const gui_app_state& state , uint32_t pid )
@@ -472,150 +677,6 @@ namespace
         ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
         ImGui::AlignTextToFramePadding( );
         ImGui::TextUnformatted( state.light_mode ? "Light" : "Dark" );
-    }
-
-    void draw_process_table( gui_app_state& state , const std::vector< process_entry >& visible , float height )
-    {
-        ImGuiTableFlags table_flags =
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
-            | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoKeepColumnsVisible;
-
-        if ( !ImGui::BeginTable( "##processes" , 7 , table_flags , ImVec2( -1.0f , height ) ) )
-        {
-            return;
-        }
-
-        ImGui::TableSetupColumn( " " , ImGuiTableColumnFlags_WidthFixed , 22.0f );
-        ImGui::TableSetupColumn( "PID" , ImGuiTableColumnFlags_WidthFixed , 64.0f );
-        ImGui::TableSetupColumn( "Process Name" , ImGuiTableColumnFlags_WidthStretch );
-        ImGui::TableSetupColumn( "Arch" , ImGuiTableColumnFlags_WidthFixed , 42.0f );
-        ImGui::TableSetupColumn( "Elev" , ImGuiTableColumnFlags_WidthFixed , 38.0f );
-        ImGui::TableSetupColumn( "Sess" , ImGuiTableColumnFlags_WidthFixed , 42.0f );
-        ImGui::TableSetupColumn( "PPID" , ImGuiTableColumnFlags_WidthFixed , 64.0f );
-        ImGui::TableSetupScrollFreeze( 0 , 1 );
-        ImGui::TableHeadersRow( );
-
-        const ImGuiStyle& style = ImGui::GetStyle( );
-        const float row_height = ImGui::GetTextLineHeight( ) + style.CellPadding.y * 2.0f;
-        ImDrawList* draw = ImGui::GetWindowDrawList( );
-
-        for ( int row = 0; row < static_cast< int >( visible.size( ) ); ++row )
-        {
-            const auto& process = visible [ static_cast< size_t >( row ) ];
-            ImGui::TableNextRow( ImGuiTableRowFlags_None , row_height );
-            ImGui::TableSetColumnIndex( 0 );
-            ImGui::PushID( process.pid );
-
-            float row_width = 0.0f;
-
-            for ( int column = 0; column < 7; ++column )
-            {
-                row_width += ImGui::GetColumnWidth( column );
-            }
-
-            const ImVec2 row_pos = ImGui::GetCursorScreenPos( );
-            ImGui::InvisibleButton( "##row" , ImVec2( row_width , row_height ) );
-
-            const bool hovered = ImGui::IsItemHovered( );
-            const bool clicked = ImGui::IsItemClicked( );
-            const bool double_clicked = hovered && ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left );
-            const ImVec2 min = ImGui::GetItemRectMin( );
-            const ImVec2 max = ImGui::GetItemRectMax( );
-            const bool selected = state.selected_pid == static_cast< int >( process.pid );
-            const bool focused = state.list_focus == row;
-
-            if ( selected )
-            {
-                draw->AddRectFilled( min , max , ImGui::GetColorU32( ImGuiCol_Header ) );
-            }
-            else if ( focused || hovered )
-            {
-                draw->AddRectFilled( min , max , ImGui::GetColorU32( ImGuiCol_HeaderHovered ) );
-            }
-
-            const float text_y = min.y + ( max.y - min.y - ImGui::GetTextLineHeight( ) ) * 0.5f;
-            float column_x = min.x;
-
-            const auto draw_cell = [ & ] ( const char* text , int column , bool right_align )
-            {
-                const float col_w = ImGui::GetColumnWidth( column );
-                const ImVec2 size = ImGui::CalcTextSize( text );
-                const float x = right_align
-                    ? column_x + col_w - size.x - style.CellPadding.x
-                    : column_x + style.CellPadding.x;
-                draw->AddText( ImVec2( x , text_y ) , ImGui::GetColorU32( ImGuiCol_Text ) , text );
-                column_x += col_w;
-            };
-
-            const std::string favorite = is_favorite( state , process.pid ) ? "*" : " ";
-            draw_cell( favorite.c_str( ) , 0 , false );
-
-            const std::string pid_text = std::to_string( process.pid );
-            draw_cell( pid_text.c_str( ) , 1 , true );
-
-            const std::string name_utf8 = wide_to_utf8( process.name );
-            draw_cell( name_utf8.c_str( ) , 2 , false );
-
-            const std::string arch = process.details_loaded ? ( process.is_wow64 ? "x86" : "x64" ) : "?";
-            draw_cell( arch.c_str( ) , 3 , false );
-
-            const std::string elev = process.details_loaded ? ( process.is_elevated ? "Y" : "N" ) : "?";
-            draw_cell( elev.c_str( ) , 4 , false );
-
-            const std::string sess = process.details_loaded ? std::to_string( process.session_id ) : "?";
-            draw_cell( sess.c_str( ) , 5 , true );
-
-            const std::string ppid = std::to_string( process.parent_pid );
-            draw_cell( ppid.c_str( ) , 6 , true );
-
-            if ( clicked )
-            {
-                state.list_focus = row;
-                state.selected_pid = static_cast< int >( process.pid );
-                std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
-            }
-
-            if ( ImGui::IsItemClicked( ImGuiMouseButton_Right ) )
-            {
-                toggle_favorite( state , process.pid );
-            }
-
-            if ( double_clicked )
-            {
-                state.selected_pid = static_cast< int >( process.pid );
-                std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
-                start_injection( state );
-            }
-
-            ImGui::PopID( );
-        }
-
-        ImGui::EndTable( );
-
-        if ( ImGui::IsWindowFocused( ImGuiFocusedFlags_RootAndChildWindows ) && !ImGui::IsAnyItemActive( ) )
-        {
-            if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) && state.list_focus > 0 )
-            {
-                --state.list_focus;
-            }
-
-            if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) && state.list_focus + 1 < static_cast< int >( visible.size( ) ) )
-            {
-                ++state.list_focus;
-            }
-
-            if ( state.list_focus >= 0 && state.list_focus < static_cast< int >( visible.size( ) ) )
-            {
-                const auto& focused_process = visible [ static_cast< size_t >( state.list_focus ) ];
-                state.selected_pid = static_cast< int >( focused_process.pid );
-                std::strncpy( state.search , wide_to_utf8( focused_process.name ).c_str( ) , sizeof( state.search ) - 1 );
-
-                if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
-                {
-                    start_injection( state );
-                }
-            }
-        }
     }
 
     void draw_recent_dll_cards( gui_app_state& state )
@@ -1083,7 +1144,8 @@ void gui_state_render( gui_app_state& state )
     }
 
     const auto visible = visible_processes( state );
-    draw_process_table( state , visible , io.DisplaySize.y * 0.30f );
+    ImGui::TextDisabled( "%d process(es) shown" , static_cast< int >( visible.size( ) ) );
+    draw_process_list( state , visible , io.DisplaySize.y * 0.30f );
 
     if ( state.selected_pid > 0 )
     {

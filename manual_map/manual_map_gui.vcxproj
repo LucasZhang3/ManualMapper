@@ -68,7 +68,7 @@
       <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)scripts\ensure-gui-not-running.ps1"</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\scripts\ensure-gui-not-running.ps1"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -88,7 +88,7 @@
       <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)scripts\ensure-gui-not-running.ps1"</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\scripts\ensure-gui-not-running.ps1"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
