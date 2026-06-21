@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "gui_state.hpp"
+#include "gui_process_icons.hpp"
 #include "gui_theme.hpp"
 #include "gui_widgets.hpp"
 #include "window_stealth.hpp"
@@ -712,11 +713,21 @@ namespace
                 }
 
                 const float text_y = item_min.y + ( item_max.y - item_min.y - ImGui::GetTextLineHeight( ) ) * 0.5f;
-                const char letter = avatar_letter( process.name );
-                const ImVec4 accent = gui_theme_accent( state.config.accent_index );
-                draw->AddCircleFilled( ImVec2( item_min.x + 16.0f , item_min.y + row_height * 0.5f ) , 12.0f , ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.35f ) ) );
-                char letter_buf [ 2 ] = { letter , '\0' };
-                draw->AddText( ImVec2( item_min.x + 11.0f , text_y ) , text_color , letter_buf );
+                const ImTextureID process_icon = process_icons_get( process.exe_path );
+                const float icon_y = item_min.y + ( row_height - 24.0f ) * 0.5f;
+
+                if ( process_icon )
+                {
+                    draw->AddImage( process_icon , ImVec2( item_min.x + 4.0f , icon_y ) , ImVec2( item_min.x + 28.0f , icon_y + 24.0f ) );
+                }
+                else
+                {
+                    const char letter = avatar_letter( process.name );
+                    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+                    draw->AddCircleFilled( ImVec2( item_min.x + 16.0f , item_min.y + row_height * 0.5f ) , 12.0f , ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.35f ) ) );
+                    char letter_buf [ 2 ] = { letter , '\0' };
+                    draw->AddText( ImVec2( item_min.x + 11.0f , text_y ) , text_color , letter_buf );
+                }
 
                 const std::string name_utf8 = wide_to_utf8( process.name );
                 draw->AddText( ImVec2( item_min.x + 36.0f , text_y ) , text_color , name_utf8.c_str( ) );
@@ -1701,12 +1712,16 @@ void gui_state_set_dll_path( gui_app_state& state , const wchar_t* path )
 
 void gui_state_save_window( gui_app_state& state , void* hwnd )
 {
-    RECT rect {};
-    GetWindowRect( static_cast< HWND >( hwnd ) , &rect );
-    state.config.window_x = rect.left;
-    state.config.window_y = rect.top;
-    state.config.window_w = rect.right - rect.left;
-    state.config.window_h = rect.bottom - rect.top;
+    const HWND window = static_cast< HWND >( hwnd );
+    RECT window_rect {};
+    GetWindowRect( window , &window_rect );
+    state.config.window_x = window_rect.left;
+    state.config.window_y = window_rect.top;
+
+    RECT client_rect {};
+    GetClientRect( window , &client_rect );
+    state.config.window_w = client_rect.right - client_rect.left;
+    state.config.window_h = client_rect.bottom - client_rect.top;
     state.config.panel_split = state.panel_split;
     save_config( state.config );
 }
@@ -1724,9 +1739,14 @@ void gui_state_render( gui_app_state& state )
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus );
 
     gui_draw_title_bar( state , g_gui_hwnd );
-    gui_draw_sidebar( state );
 
-    ImGui::BeginChild( "MainContent" , ImVec2( 0.0f , -tokens.status_bar_height ) , ImGuiChildFlags_None );
+    const float body_height = io.DisplaySize.y - tokens.title_bar_height - tokens.status_bar_height;
+    const float main_width = io.DisplaySize.x - tokens.sidebar_width;
+
+    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None );
+
+    ImGui::SetCursorPos( ImVec2( tokens.sidebar_width , 0.0f ) );
+    ImGui::BeginChild( "MainContent" , ImVec2( main_width , body_height ) , ImGuiChildFlags_None );
 
     switch ( state.current_page )
     {
@@ -1740,6 +1760,11 @@ void gui_state_render( gui_app_state& state )
         draw_settings_page( state );
         break;
     }
+
+    ImGui::EndChild( );
+
+    ImGui::SetCursorPos( ImVec2( 0.0f , 0.0f ) );
+    gui_draw_sidebar( state );
 
     ImGui::EndChild( );
 

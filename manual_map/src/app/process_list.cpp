@@ -52,6 +52,14 @@ namespace
             CloseHandle( token );
         }
 
+        wchar_t image_path [ MAX_PATH ] = {};
+        DWORD image_path_size = MAX_PATH;
+
+        if ( QueryFullProcessImageNameW( handle , 0 , image_path , &image_path_size ) )
+        {
+            process.exe_path.assign( image_path , image_path_size );
+        }
+
         CloseHandle( handle );
     }
 }

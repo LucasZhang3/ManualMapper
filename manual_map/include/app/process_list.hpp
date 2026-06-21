@@ -17,6 +17,7 @@ struct process_entry
     uint32_t parent_pid = 0;
     uint32_t session_id = 0;
     std::wstring name;
+    std::wstring exe_path;
     bool is_wow64 = false;
     bool is_elevated = false;
     bool details_loaded = false;

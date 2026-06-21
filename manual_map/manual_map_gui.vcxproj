@@ -67,7 +67,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)src\gui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -94,7 +94,7 @@ xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Comma
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)src\gui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -113,6 +113,7 @@ xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Comma
     <ClCompile Include="src\gui\gui_state.cpp" />
     <ClCompile Include="src\gui\gui_theme.cpp" />
     <ClCompile Include="src\gui\gui_widgets.cpp" />
+    <ClCompile Include="src\gui\gui_process_icons.cpp" />
     <ClCompile Include="src\gui\gui_tray.cpp" />
     <ClCompile Include="src\gui\window_stealth.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
@@ -127,6 +128,7 @@ xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Comma
     <ClInclude Include="src\gui\gui_state.hpp" />
     <ClInclude Include="src\gui\gui_theme.hpp" />
     <ClInclude Include="src\gui\gui_widgets.hpp" />
+    <ClInclude Include="src\gui\gui_process_icons.hpp" />
     <ClInclude Include="src\gui\gui_tray.hpp" />
     <ClInclude Include="src\gui\resource.h" />
     <ClInclude Include="src\gui\window_stealth.hpp" />

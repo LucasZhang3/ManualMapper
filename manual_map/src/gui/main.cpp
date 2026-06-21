@@ -6,6 +6,7 @@
 #include <app/config.hpp>
 
 #include <windows.h>
+#include <windowsx.h>
 #include <shellapi.h>
 
 #include <imgui_impl_win32.h>
@@ -14,6 +15,58 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND hwnd , UINT m
 
 namespace
 {
+    LRESULT hit_test_borderless( HWND hwnd , LPARAM lparam )
+    {
+        constexpr LONG border = 8;
+        POINT point { GET_X_LPARAM( lparam ) , GET_Y_LPARAM( lparam ) };
+        ScreenToClient( hwnd , &point );
+
+        RECT client_rect {};
+        GetClientRect( hwnd , &client_rect );
+
+        if ( point.y < border )
+        {
+            if ( point.x < border )
+            {
+                return HTTOPLEFT;
+            }
+
+            if ( point.x >= client_rect.right - border )
+            {
+                return HTTOPRIGHT;
+            }
+
+            return HTTOP;
+        }
+
+        if ( point.y >= client_rect.bottom - border )
+        {
+            if ( point.x < border )
+            {
+                return HTBOTTOMLEFT;
+            }
+
+            if ( point.x >= client_rect.right - border )
+            {
+                return HTBOTTOMRIGHT;
+            }
+
+            return HTBOTTOM;
+        }
+
+        if ( point.x < border )
+        {
+            return HTLEFT;
+        }
+
+        if ( point.x >= client_rect.right - border )
+        {
+            return HTRIGHT;
+        }
+
+        return HTCLIENT;
+    }
+
     LRESULT WINAPI window_proc( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam )
     {
         if ( gui_tray_handle_message( hwnd , msg , wparam , lparam ) )
@@ -28,6 +81,15 @@ namespace
 
         switch ( msg )
         {
+        case WM_NCHITTEST:
+            return hit_test_borderless( hwnd , lparam );
+        case WM_GETMINMAXINFO:
+        {
+            auto* min_max = reinterpret_cast< MINMAXINFO* >( lparam );
+            min_max->ptMinTrackSize.x = 800;
+            min_max->ptMinTrackSize.y = 500;
+            return 0;
+        }
         case WM_SIZE:
             if ( wparam != SIZE_MINIMIZED )
             {
@@ -97,14 +159,20 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
     const int window_w = config.window_w > 0 ? config.window_w : 1280;
     const int window_h = config.window_h > 0 ? config.window_h : 720;
 
+    const DWORD window_style = WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
+    RECT window_rect { 0 , 0 , window_w , window_h };
+    AdjustWindowRectEx( &window_rect , window_style , FALSE , 0 );
+    const int outer_w = window_rect.right - window_rect.left;
+    const int outer_h = window_rect.bottom - window_rect.top;
+
     HWND hwnd = CreateWindowW(
         window_class.lpszClassName ,
         L"Manual Map Injector" ,
-        WS_OVERLAPPEDWINDOW ,
+        window_style ,
         window_x ,
         window_y ,
-        window_w ,
-        window_h ,
+        outer_w ,
+        outer_h ,
         nullptr ,
         nullptr ,
         instance ,

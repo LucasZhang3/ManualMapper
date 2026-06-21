@@ -314,8 +314,7 @@ void gui_draw_title_bar( gui_app_state& state , void* hwnd )
         PostMessageW( static_cast< HWND >( hwnd ) , WM_CLOSE , 0 , 0 );
     }
 
-    ImGui::SetCursorScreenPos( ImVec2( bar_min.x , bar_max.y ) );
-    ImGui::Dummy( ImVec2( 0.0f , 0.0f ) );
+    ImGui::Dummy( ImVec2( io.DisplaySize.x , tokens.title_bar_height ) );
 }
 
 void gui_draw_status_bar( gui_app_state& state )
@@ -355,7 +354,7 @@ void gui_draw_status_bar( gui_app_state& state )
 void gui_draw_sidebar( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
-    ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , -tokens.status_bar_height ) , ImGuiChildFlags_None );
+    ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , 0.0f ) , ImGuiChildFlags_None );
 
     struct nav_item { gui_page page; const char* label; };
     static const nav_item items [ ] =
@@ -381,7 +380,6 @@ void gui_draw_sidebar( gui_app_state& state )
     }
 
     ImGui::EndChild( );
-    ImGui::SameLine( );
 }
 
 void gui_draw_command_palette( gui_app_state& state )

@@ -1,4 +1,5 @@
 #include "gui_app.hpp"
+#include "gui_process_icons.hpp"
 #include "gui_state.hpp"
 #include "gui_theme.hpp"
 
@@ -292,6 +293,7 @@ bool gui_app_init( )
 void gui_app_shutdown( )
 {
     gui_state_save_window( g_state , g_gui_hwnd );
+    process_icons_shutdown( );
     gui_state_shutdown( g_state );
     ImGui_ImplDX11_Shutdown( );
     ImGui_ImplWin32_Shutdown( );
