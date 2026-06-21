@@ -1,0 +1,24 @@
+---
+description: Git commit author policy — Lucas only, no Cursor co-author
+alwaysApply: true
+---
+
+# Git commits (this repository)
+
+When committing or pushing for this project:
+
+- Commits must be authored **only** by Lucas Zhang (`Lucas Zhang <lucaszhang1118@gmail.com>`).
+- **Never** use plain `git commit` from the Cursor agent shell — it may append `Co-authored-by: Cursor <cursoragent@cursor.com>`.
+- **Always** use the repo helper: `scripts/commit.ps1` (see below).
+- Do **not** add Cursor, Cursor Agent, or any AI tool in commit messages, trailers, or metadata.
+- Do not amend/push with `--force` to `main` unless the user explicitly asks.
+
+## Commit workflow
+
+```powershell
+Push-Location -LiteralPath 'C:\Users\Lucas\Downloads\manual_map_[unknowncheats.me]_\manual_map'
+git add -A
+.\scripts\commit.ps1 -Message "Your message here" -Push
+```
+
+Use `-Body` for extra paragraph lines if needed. Omit `-Push` unless the user asked to push.
