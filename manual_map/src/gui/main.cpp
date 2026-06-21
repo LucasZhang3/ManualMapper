@@ -1,42 +1,77 @@
 #include "gui_app.hpp"
 #include "gui_tray.hpp"
 #include "gui_state.hpp"
+#include "gui_theme.hpp"
 #include "resource.h"
 
 #include <app/config.hpp>
 
 #include <windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 #include <shellapi.h>
 
 #include <imgui_impl_win32.h>
+
+#pragma comment( lib , "dwmapi.lib" )
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam );
 
 namespace
 {
+    void apply_borderless_chrome( HWND hwnd )
+    {
+        BOOL disable_nc = TRUE;
+        DwmSetWindowAttribute( hwnd , DWMWA_NCRENDERING_ENABLED , &disable_nc , sizeof( disable_nc ) );
+
+        BOOL use_immersive_dark = TRUE;
+        DwmSetWindowAttribute( hwnd , 20 , &use_immersive_dark , sizeof( use_immersive_dark ) );
+
+        MARGINS margins { 0 , 0 , 0 , 0 };
+        DwmExtendFrameIntoClientArea( hwnd , &margins );
+    }
+
     LRESULT hit_test_borderless( HWND hwnd , LPARAM lparam )
     {
-        constexpr LONG border = 8;
+        float title_h = 36.0f;
+        float status_h = 26.0f;
+
+        if ( gui_app_state* state = gui_app_state_ptr( ) )
+        {
+            const auto& tokens = gui_theme_tokens_for( *state );
+            title_h = tokens.title_bar_height;
+            status_h = tokens.status_bar_height;
+        }
+
         POINT point { GET_X_LPARAM( lparam ) , GET_Y_LPARAM( lparam ) };
         ScreenToClient( hwnd , &point );
 
         RECT client_rect {};
         GetClientRect( hwnd , &client_rect );
 
-        if ( point.y < border )
+        constexpr LONG border = 6;
+
+        if ( point.y < static_cast< LONG >( title_h ) )
         {
-            if ( point.x < border )
+            if ( point.y < border )
             {
-                return HTTOPLEFT;
+                if ( point.x < border )
+                {
+                    return HTTOPLEFT;
+                }
+
+                if ( point.x >= client_rect.right - border )
+                {
+                    return HTTOPRIGHT;
+                }
             }
 
-            if ( point.x >= client_rect.right - border )
-            {
-                return HTTOPRIGHT;
-            }
+            return HTCLIENT;
+        }
 
-            return HTTOP;
+        if ( point.y >= client_rect.bottom - static_cast< LONG >( status_h ) )
+        {
+            return HTCLIENT;
         }
 
         if ( point.y >= client_rect.bottom - border )
@@ -81,6 +116,13 @@ namespace
 
         switch ( msg )
         {
+        case WM_NCCALCSIZE:
+            if ( wparam != 0 )
+            {
+                return 0;
+            }
+
+            break;
         case WM_NCHITTEST:
             return hit_test_borderless( hwnd , lparam );
         case WM_GETMINMAXINFO:
@@ -159,11 +201,7 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
     const int window_w = config.window_w > 0 ? config.window_w : 1280;
     const int window_h = config.window_h > 0 ? config.window_h : 720;
 
-    const DWORD window_style = WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
-    RECT window_rect { 0 , 0 , window_w , window_h };
-    AdjustWindowRectEx( &window_rect , window_style , FALSE , 0 );
-    const int outer_w = window_rect.right - window_rect.left;
-    const int outer_h = window_rect.bottom - window_rect.top;
+    const DWORD window_style = WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
 
     HWND hwnd = CreateWindowW(
         window_class.lpszClassName ,
@@ -171,12 +209,14 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
         window_style ,
         window_x ,
         window_y ,
-        outer_w ,
-        outer_h ,
+        window_w ,
+        window_h ,
         nullptr ,
         nullptr ,
         instance ,
         nullptr );
+
+    apply_borderless_chrome( hwnd );
 
     const HICON big_icon = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );
     const HICON small_icon = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );

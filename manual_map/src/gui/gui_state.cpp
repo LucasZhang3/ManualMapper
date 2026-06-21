@@ -1730,7 +1730,9 @@ void gui_state_render( gui_app_state& state )
 {
     ImGuiIO& io = ImGui::GetIO( );
     const auto& tokens = gui_theme_tokens_for( state );
+    const float body_height = io.DisplaySize.y - tokens.title_bar_height - tokens.status_bar_height;
 
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
     ImGui::SetNextWindowPos( ImVec2( 0.0f , 0.0f ) );
     ImGui::SetNextWindowSize( io.DisplaySize );
     ImGui::Begin(
@@ -1738,15 +1740,30 @@ void gui_state_render( gui_app_state& state )
         nullptr ,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus );
 
+    const ImVec4 title_bg = state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f );
+    const ImVec4 sidebar_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
+
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 3.0f ) );
+    ImGui::PushStyleColor( ImGuiCol_ChildBg , title_bg );
+    ImGui::BeginChild( "TitleBar" , ImVec2( 0.0f , tokens.title_bar_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
     gui_draw_title_bar( state , g_gui_hwnd );
+    ImGui::EndChild( );
+    ImGui::PopStyleColor( );
+    ImGui::PopStyleVar( );
 
-    const float body_height = io.DisplaySize.y - tokens.title_bar_height - tokens.status_bar_height;
-    const float main_width = io.DisplaySize.x - tokens.sidebar_width;
+    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
 
-    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None );
+    ImGui::PushStyleColor( ImGuiCol_ChildBg , sidebar_bg );
+    ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
+    gui_draw_sidebar( state );
+    ImGui::EndChild( );
+    ImGui::PopStyleColor( );
 
-    ImGui::SetCursorPos( ImVec2( tokens.sidebar_width , 0.0f ) );
-    ImGui::BeginChild( "MainContent" , ImVec2( main_width , body_height ) , ImGuiChildFlags_None );
+    ImGui::SameLine( 0.0f , 0.0f );
+
+    ImGui::BeginChild( "MainContent" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
+
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
 
     switch ( state.current_page )
     {
@@ -1761,11 +1778,8 @@ void gui_state_render( gui_app_state& state )
         break;
     }
 
+    ImGui::PopStyleVar( );
     ImGui::EndChild( );
-
-    ImGui::SetCursorPos( ImVec2( 0.0f , 0.0f ) );
-    gui_draw_sidebar( state );
-
     ImGui::EndChild( );
 
     gui_draw_status_bar( state );
@@ -1776,4 +1790,5 @@ void gui_state_render( gui_app_state& state )
     gui_draw_drag_overlay( state );
 
     ImGui::End( );
+    ImGui::PopStyleVar( );
 }

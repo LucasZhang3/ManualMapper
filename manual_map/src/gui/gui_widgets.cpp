@@ -57,20 +57,6 @@ namespace
         return true;
     }
 
-    void title_bar_button( const char* id , const char* label , float width , float height )
-    {
-        ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 1 , 1 , 1 , 0.08f ) );
-        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , 0.12f ) );
-        ImGui::Button( id , ImVec2( width , height ) );
-        const ImVec2 min = ImGui::GetItemRectMin( );
-        const ImVec2 max = ImGui::GetItemRectMax( );
-        ImGui::PopStyleColor( 3 );
-        ImGui::GetWindowDrawList( )->AddText(
-            ImVec2( min.x + ( max.x - min.x - ImGui::CalcTextSize( label ).x ) * 0.5f , min.y + ( max.y - min.y - ImGui::GetTextLineHeight( ) ) * 0.5f ) ,
-            ImGui::GetColorU32( ImGuiCol_Text ) ,
-            label );
-    }
 }
 
 void gui_push_toast( gui_app_state& state , const char* message , toast_type type )
@@ -234,20 +220,25 @@ void gui_end_section_card( )
 void gui_draw_title_bar( gui_app_state& state , void* hwnd )
 {
     const auto& tokens = gui_theme_tokens_for( state );
-    const ImGuiIO& io = ImGui::GetIO( );
-    ImDrawList* draw = ImGui::GetWindowDrawList( );
-    const ImVec2 bar_min = ImGui::GetCursorScreenPos( );
-    const ImVec2 bar_max( bar_min.x + io.DisplaySize.x , bar_min.y + tokens.title_bar_height );
-    const ImU32 bar_bg = ImGui::GetColorU32( state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f ) );
-    draw->AddRectFilled( bar_min , bar_max , bar_bg );
+    const HWND window = static_cast< HWND >( hwnd );
+    const float bar_h = tokens.title_bar_height - 6.0f;
+    const float btn_w = 46.0f;
+    const float buttons_w = btn_w * 3.0f;
+    const float total_w = ImGui::GetContentRegionAvail( ).x;
+    const ImVec2 row_start = ImGui::GetCursorScreenPos( );
 
-    float x = bar_min.x + 12.0f;
-    const float icon_size = tokens.title_bar_height - 12.0f;
+    ImDrawList* draw = ImGui::GetWindowDrawList( );
+
+    float label_x = row_start.x + 10.0f;
+    const float icon_size = bar_h - 4.0f;
 
     if ( state.app_icon_texture )
     {
-        draw->AddImage( state.app_icon_texture , ImVec2( x , bar_min.y + 6.0f ) , ImVec2( x + icon_size , bar_min.y + 6.0f + icon_size ) );
-        x += icon_size + 8.0f;
+        draw->AddImage(
+            state.app_icon_texture ,
+            ImVec2( label_x , row_start.y + 2.0f ) ,
+            ImVec2( label_x + icon_size , row_start.y + 2.0f + icon_size ) );
+        label_x += icon_size + 8.0f;
     }
 
     if ( state.font_header )
@@ -255,27 +246,32 @@ void gui_draw_title_bar( gui_app_state& state , void* hwnd )
         ImGui::PushFont( state.font_header );
     }
 
-    draw->AddText( ImVec2( x , bar_min.y + ( tokens.title_bar_height - ImGui::GetTextLineHeight( ) ) * 0.5f ) , ImGui::GetColorU32( ImGuiCol_Text ) , "Manual Map Injector" );
+    draw->AddText(
+        ImVec2( label_x , row_start.y + ( bar_h - ImGui::GetTextLineHeight( ) ) * 0.5f ) ,
+        ImGui::GetColorU32( ImGuiCol_Text ) ,
+        "Manual Map Injector" );
 
     if ( state.font_header )
     {
         ImGui::PopFont( );
     }
 
-    ImGui::SetCursorScreenPos( ImVec2( bar_min.x , bar_min.y ) );
-    ImGui::InvisibleButton( "##title_drag" , ImVec2( io.DisplaySize.x - 120.0f , tokens.title_bar_height ) );
+    ImGui::SetCursorScreenPos( row_start );
+    ImGui::InvisibleButton( "##title_drag" , ImVec2( ( std::max )( 0.0f , total_w - buttons_w ) , bar_h ) );
 
     if ( ImGui::IsItemActive( ) && ImGui::IsMouseDragging( ImGuiMouseButton_Left ) )
     {
         ReleaseCapture( );
-        SendMessageW( static_cast< HWND >( hwnd ) , WM_NCLBUTTONDOWN , HTCAPTION , 0 );
+        SendMessageW( window , WM_NCLBUTTONDOWN , HTCAPTION , 0 );
     }
 
-    const float btn_w = 40.0f;
-    ImGui::SetCursorScreenPos( ImVec2( bar_max.x - btn_w * 3.0f , bar_min.y + 2.0f ) );
-    title_bar_button( "##min" , "_" , btn_w , tokens.title_bar_height - 4.0f );
+    ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
+    ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , 0.10f ) );
+    ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 1 , 1 , 1 , 0.08f ) );
 
-    if ( ImGui::IsItemClicked( ) )
+    ImGui::SetCursorScreenPos( ImVec2( row_start.x + total_w - buttons_w , row_start.y ) );
+
+    if ( ImGui::Button( "##min" , ImVec2( btn_w , bar_h ) ) )
     {
         if ( state.config.min_to_tray )
         {
@@ -283,38 +279,42 @@ void gui_draw_title_bar( gui_app_state& state , void* hwnd )
         }
         else
         {
-            ShowWindow( static_cast< HWND >( hwnd ) , SW_MINIMIZE );
+            ShowWindow( window , SW_MINIMIZE );
         }
     }
 
-    ImGui::SetCursorScreenPos( ImVec2( bar_max.x - btn_w * 2.0f , bar_min.y + 2.0f ) );
-    title_bar_button( "##max" , state.window_maximized ? "R" : "[]" , btn_w , tokens.title_bar_height - 4.0f );
+    ImGui::SameLine( 0.0f , 0.0f );
 
-    if ( ImGui::IsItemClicked( ) )
+    if ( ImGui::Button( state.window_maximized ? "##restore" : "##max" , ImVec2( btn_w , bar_h ) ) )
     {
         if ( state.window_maximized )
         {
-            ShowWindow( static_cast< HWND >( hwnd ) , SW_RESTORE );
+            ShowWindow( window , SW_RESTORE );
             state.window_maximized = false;
         }
         else
         {
-            ShowWindow( static_cast< HWND >( hwnd ) , SW_MAXIMIZE );
+            ShowWindow( window , SW_MAXIMIZE );
             state.window_maximized = true;
         }
     }
 
-    ImGui::SetCursorScreenPos( ImVec2( bar_max.x - btn_w , bar_min.y + 2.0f ) );
+    ImGui::SameLine( 0.0f , 0.0f );
     ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( 0.85f , 0.20f , 0.20f , 0.85f ) );
-    title_bar_button( "##close" , "X" , btn_w , tokens.title_bar_height - 4.0f );
-    ImGui::PopStyleColor( );
 
-    if ( ImGui::IsItemClicked( ) )
+    if ( ImGui::Button( "##close" , ImVec2( btn_w , bar_h ) ) )
     {
-        PostMessageW( static_cast< HWND >( hwnd ) , WM_CLOSE , 0 , 0 );
+        PostMessageW( window , WM_CLOSE , 0 , 0 );
     }
 
-    ImGui::Dummy( ImVec2( io.DisplaySize.x , tokens.title_bar_height ) );
+    ImGui::PopStyleColor( 4 );
+
+    const ImVec2 btn_min( row_start.x + total_w - buttons_w , row_start.y );
+    const float glyph_y = row_start.y + ( bar_h - ImGui::GetTextLineHeight( ) ) * 0.5f;
+    const ImU32 glyph = ImGui::GetColorU32( ImGuiCol_Text );
+    draw->AddText( ImVec2( btn_min.x + 18.0f , glyph_y ) , glyph , "-" );
+    draw->AddText( ImVec2( btn_min.x + btn_w + 14.0f , glyph_y ) , glyph , state.window_maximized ? "R" : "[]" );
+    draw->AddText( ImVec2( btn_min.x + btn_w * 2.0f + 16.0f , glyph_y ) , glyph , "X" );
 }
 
 void gui_draw_status_bar( gui_app_state& state )
@@ -354,7 +354,6 @@ void gui_draw_status_bar( gui_app_state& state )
 void gui_draw_sidebar( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
-    ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , 0.0f ) , ImGuiChildFlags_None );
 
     struct nav_item { gui_page page; const char* label; };
     static const nav_item items [ ] =
@@ -370,16 +369,16 @@ void gui_draw_sidebar( gui_app_state& state )
     {
         const bool selected = state.current_page == item.page;
         ImGui::PushStyleColor( ImGuiCol_Header , selected ? gui_theme_accent_muted( state.config.accent_index , state.light_mode ) : ImVec4( 0 , 0 , 0 , 0 ) );
+        ImGui::PushStyleColor( ImGuiCol_HeaderHovered , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.05f : 0.06f ) );
+        ImGui::PushStyleColor( ImGuiCol_HeaderActive , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.08f : 0.10f ) );
 
         if ( ImGui::Selectable( item.label , selected , 0 , ImVec2( -1.0f , tokens.row_height * 0.75f ) ) )
         {
             state.current_page = item.page;
         }
 
-        ImGui::PopStyleColor( );
+        ImGui::PopStyleColor( 3 );
     }
-
-    ImGui::EndChild( );
 }
 
 void gui_draw_command_palette( gui_app_state& state )
