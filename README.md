@@ -38,7 +38,7 @@ This repository is intended for **local debugging, security research, and author
 | `manual_map.exe` | `bin/Release/x64/manual_map.exe` | Scriptable / interactive CLI |
 | `payload_dll.dll` | `bin/Release/x64/payload_dll.dll` | Reference payload with verify popup, IPC, logging |
 | `manual_map_core.lib` | `bin/Release/x64/manual_map_core.lib` | Shared static library linked by GUI and CLI |
-
+ 
 ---
 
 ## Quick start (Notepad test)
