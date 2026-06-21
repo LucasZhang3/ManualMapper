@@ -1,15 +1,22 @@
 #include "gui_app.hpp"
 #include "gui_state.hpp"
+#include "gui_theme.hpp"
+
+#include <app/config.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
 #include <d3d11.h>
+#include <wincodec.h>
+
+#include <vector>
 #include <windows.h>
 
 #pragma comment( lib , "d3d11.lib" )
 #pragma comment( lib , "dxgi.lib" )
+#pragma comment( lib , "windowscodecs.lib" )
 
 void* g_gui_hwnd = nullptr;
 
@@ -19,6 +26,7 @@ namespace
     ID3D11DeviceContext* g_context = nullptr;
     IDXGISwapChain* g_swap_chain = nullptr;
     ID3D11RenderTargetView* g_render_target = nullptr;
+    ID3D11ShaderResourceView* g_icon_srv = nullptr;
     bool g_swap_occluded = false;
     unsigned int g_resize_w = 0;
     unsigned int g_resize_h = 0;
@@ -58,6 +66,71 @@ namespace
             out [ 2 ] = 0.09f;
             out [ 3 ] = 1.0f;
         }
+    }
+
+    bool load_png_texture( const wchar_t* path , ID3D11ShaderResourceView** out_srv )
+    {
+        IWICImagingFactory* factory = nullptr;
+        IWICBitmapDecoder* decoder = nullptr;
+        IWICBitmapFrameDecode* frame = nullptr;
+        IWICFormatConverter* converter = nullptr;
+
+        if ( FAILED( CoCreateInstance( CLSID_WICImagingFactory , nullptr , CLSCTX_INPROC_SERVER , IID_PPV_ARGS( &factory ) ) ) )
+        {
+            return false;
+        }
+
+        if ( FAILED( factory->CreateDecoderFromFilename( path , nullptr , GENERIC_READ , WICDecodeMetadataCacheOnLoad , &decoder ) ) )
+        {
+            factory->Release( );
+            return false;
+        }
+
+        decoder->GetFrame( 0 , &frame );
+        factory->CreateFormatConverter( &converter );
+        converter->Initialize( frame , GUID_WICPixelFormat32bppRGBA , WICBitmapDitherTypeNone , nullptr , 0.0 , WICBitmapPaletteTypeCustom );
+
+        UINT width = 0;
+        UINT height = 0;
+        converter->GetSize( &width , &height );
+
+        const UINT stride = width * 4;
+        const UINT image_size = stride * height;
+        std::vector< uint8_t > pixels( image_size );
+        converter->CopyPixels( nullptr , stride , image_size , pixels.data( ) );
+
+        D3D11_TEXTURE2D_DESC desc {};
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+        D3D11_SUBRESOURCE_DATA subresource {};
+        subresource.pSysMem = pixels.data( );
+        subresource.SysMemPitch = stride;
+
+        ID3D11Texture2D* texture = nullptr;
+
+        if ( FAILED( g_device->CreateTexture2D( &desc , &subresource , &texture ) ) )
+        {
+            converter->Release( );
+            frame->Release( );
+            decoder->Release( );
+            factory->Release( );
+            return false;
+        }
+
+        g_device->CreateShaderResourceView( texture , nullptr , out_srv );
+        texture->Release( );
+        converter->Release( );
+        frame->Release( );
+        decoder->Release( );
+        factory->Release( );
+        return true;
     }
 }
 
@@ -122,6 +195,12 @@ bool gui_app_create_device( void* hwnd )
 
 void gui_app_destroy_device( )
 {
+    if ( g_icon_srv )
+    {
+        g_icon_srv->Release( );
+        g_icon_srv = nullptr;
+    }
+
     cleanup_render_target( );
 
     if ( g_swap_chain )
@@ -145,24 +224,68 @@ void gui_app_destroy_device( )
 
 bool gui_app_init( )
 {
+    CoInitializeEx( nullptr , COINIT_APARTMENTTHREADED );
+
     IMGUI_CHECKVERSION( );
     ImGui::CreateContext( );
     ImGuiIO& io = ImGui::GetIO( );
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = nullptr;
 
-    if ( const ImFont* font = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\segoeui.ttf" , 17.0f ) )
+    load_config( g_state.config );
+    g_state.light_mode = g_state.config.light_mode;
+
+    const float body_size = g_state.config.compact_mode ? 14.0f : 15.0f;
+    const float header_size = body_size + 2.0f;
+    const float mono_size = g_state.config.compact_mode ? 13.0f : 14.0f;
+
+    g_state.font_body = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\segoeui.ttf" , body_size );
+    g_state.font_header = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\segoeuib.ttf" , header_size );
+    g_state.font_mono = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\cascadiamono.ttf" , mono_size );
+
+    if ( !g_state.font_body )
     {
-        ( void )font;
+        g_state.font_body = io.Fonts->AddFontDefault( );
     }
-    else
+
+    if ( !g_state.font_header )
     {
-        io.Fonts->AddFontDefault( );
+        g_state.font_header = g_state.font_body;
     }
+
+    if ( !g_state.font_mono )
+    {
+        g_state.font_mono = g_state.font_body;
+    }
+
+    io.FontDefault = g_state.font_body;
 
     ImGui_ImplWin32_Init( g_gui_hwnd );
     ImGui_ImplDX11_Init( g_device , g_context );
+
+    wchar_t icon_path [ MAX_PATH ] = {};
+    GetModuleFileNameW( nullptr , icon_path , MAX_PATH );
+    wchar_t* slash = wcsrchr( icon_path , L'\\' );
+
+    if ( slash )
+    {
+        *( slash + 1 ) = L'\0';
+        wcscat_s( icon_path , L"assets\\app_icon.png" );
+
+        if ( !load_png_texture( icon_path , &g_icon_srv ) )
+        {
+            wcscpy_s( slash + 1 , MAX_PATH - ( slash + 1 - icon_path ) , L"src\\gui\\assets\\app_icon.png" );
+            load_png_texture( icon_path , &g_icon_srv );
+        }
+
+        if ( g_icon_srv )
+        {
+            g_state.app_icon_texture = reinterpret_cast< ImTextureID >( g_icon_srv );
+        }
+    }
+
     gui_state_init( g_state );
+    gui_theme_init( g_state );
     return true;
 }
 
@@ -173,6 +296,7 @@ void gui_app_shutdown( )
     ImGui_ImplDX11_Shutdown( );
     ImGui_ImplWin32_Shutdown( );
     ImGui::DestroyContext( );
+    CoUninitialize( );
 }
 
 void gui_app_on_resize( unsigned int width , unsigned int height )
@@ -231,4 +355,14 @@ void gui_app_set_dll_path( const wchar_t* path )
 app_config* gui_app_config( )
 {
     return &g_state.config;
+}
+
+gui_app_state* gui_app_state_ptr( )
+{
+    return &g_state;
+}
+
+ID3D11Device* gui_app_device( )
+{
+    return g_device;
 }

@@ -1,4 +1,7 @@
 #include "gui_app.hpp"
+#include "gui_tray.hpp"
+#include "gui_state.hpp"
+#include "resource.h"
 
 #include <app/config.hpp>
 
@@ -13,6 +16,11 @@ namespace
 {
     LRESULT WINAPI window_proc( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam )
     {
+        if ( gui_tray_handle_message( hwnd , msg , wparam , lparam ) )
+        {
+            return 0;
+        }
+
         if ( ImGui_ImplWin32_WndProcHandler( hwnd , msg , wparam , lparam ) )
         {
             return true;
@@ -24,6 +32,11 @@ namespace
             if ( wparam != SIZE_MINIMIZED )
             {
                 gui_app_on_resize( LOWORD( lparam ) , HIWORD( lparam ) );
+
+                if ( gui_app_state_ptr( ) )
+                {
+                    gui_app_state_ptr( )->window_maximized = wparam == SIZE_MAXIMIZED;
+                }
             }
 
             return 0;
@@ -35,6 +48,11 @@ namespace
             if ( DragQueryFileW( drop , 0 , path , MAX_PATH ) )
             {
                 gui_app_set_dll_path( path );
+
+                if ( gui_app_state_ptr( ) )
+                {
+                    gui_state_on_drag_enter( *gui_app_state_ptr( ) );
+                }
             }
 
             DragFinish( drop );
@@ -48,6 +66,7 @@ namespace
 
             break;
         case WM_DESTROY:
+            gui_tray_shutdown( );
             PostQuitMessage( 0 );
             return 0;
         default:
@@ -66,6 +85,8 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
     window_class.lpfnWndProc = window_proc;
     window_class.hInstance = instance;
     window_class.lpszClassName = L"ManualMapInjectorGui";
+    window_class.hIcon = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );
+    window_class.hIconSm = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );
     RegisterClassExW( &window_class );
 
     app_config config {};
@@ -89,6 +110,11 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
         instance ,
         nullptr );
 
+    const HICON big_icon = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );
+    const HICON small_icon = LoadIconW( instance , MAKEINTRESOURCEW( IDI_APP_ICON ) );
+    SendMessageW( hwnd , WM_SETICON , ICON_BIG , reinterpret_cast< LPARAM >( big_icon ) );
+    SendMessageW( hwnd , WM_SETICON , ICON_SMALL , reinterpret_cast< LPARAM >( small_icon ) );
+
     DragAcceptFiles( hwnd , TRUE );
 
     if ( !gui_app_create_device( hwnd ) )
@@ -107,6 +133,8 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
         UnregisterClassW( window_class.lpszClassName , instance );
         return 1;
     }
+
+    gui_tray_init( hwnd , instance );
 
     bool running = true;
 

@@ -1,0 +1,133 @@
+#include "gui_theme.hpp"
+#include "gui_state.hpp"
+
+#include <imgui.h>
+
+namespace
+{
+    gui_theme_tokens g_tokens {};
+
+    const ImVec4 g_accents [ 4 ] =
+    {
+        ImVec4( 0.55f , 0.35f , 0.95f , 1.0f ) ,
+        ImVec4( 0.20f , 0.65f , 0.85f , 1.0f ) ,
+        ImVec4( 0.90f , 0.45f , 0.35f , 1.0f ) ,
+        ImVec4( 0.35f , 0.85f , 0.55f , 1.0f )
+    };
+}
+
+ImVec4 gui_theme_accent( int accent_index )
+{
+    const int idx = accent_index < 0 ? 0 : ( accent_index >= 4 ? 3 : accent_index );
+    return g_accents [ idx ];
+}
+
+ImVec4 gui_theme_accent_muted( int accent_index , bool light_mode )
+{
+    ImVec4 accent = gui_theme_accent( accent_index );
+
+    if ( light_mode )
+    {
+        return ImVec4( accent.x * 0.85f + 0.15f , accent.y * 0.85f + 0.15f , accent.z * 0.85f + 0.15f , 0.35f );
+    }
+
+    return ImVec4( accent.x , accent.y , accent.z , 0.45f );
+}
+
+const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state )
+{
+    g_tokens.body_size = state.config.compact_mode ? 14.0f : 15.0f;
+    g_tokens.label_size = state.config.compact_mode ? 12.0f : 13.0f;
+    g_tokens.mono_size = state.config.compact_mode ? 13.0f : 14.0f;
+    g_tokens.title_bar_height = state.config.compact_mode ? 32.0f : 36.0f;
+    g_tokens.sidebar_width = state.config.compact_mode ? 160.0f : 180.0f;
+    g_tokens.status_bar_height = state.config.compact_mode ? 24.0f : 26.0f;
+    g_tokens.row_height = state.config.compact_mode ? 34.0f : 38.0f;
+    g_tokens.card_padding = state.config.compact_mode ? 10.0f : 12.0f;
+    g_tokens.section_spacing = state.config.compact_mode ? 8.0f : 10.0f;
+    return g_tokens;
+}
+
+void gui_theme_init( gui_app_state& state )
+{
+    const auto& tokens = gui_theme_tokens_for( state );
+    state.title_bar_height = tokens.title_bar_height;
+    state.sidebar_width = tokens.sidebar_width;
+    gui_theme_apply( state );
+}
+
+void gui_theme_apply( gui_app_state& state )
+{
+    const auto& tokens = gui_theme_tokens_for( state );
+    const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+
+    if ( state.light_mode )
+    {
+        ImGui::StyleColorsLight( );
+    }
+    else
+    {
+        ImGui::StyleColorsDark( );
+    }
+
+    ImGuiStyle& style = ImGui::GetStyle( );
+    const float rounding = state.config.compact_mode ? 5.0f : 6.0f;
+    style.WindowRounding = rounding;
+    style.ChildRounding = rounding;
+    style.FrameRounding = rounding;
+    style.PopupRounding = rounding;
+    style.ScrollbarRounding = rounding;
+    style.GrabRounding = rounding;
+    style.TabRounding = rounding;
+    style.WindowPadding = ImVec2( tokens.card_padding , tokens.card_padding );
+    style.ItemSpacing = ImVec2( 8.0f , state.config.compact_mode ? 5.0f : 6.0f );
+    style.FramePadding = ImVec2( 8.0f , state.config.compact_mode ? 4.0f : 5.0f );
+    style.WindowBorderSize = 0.0f;
+    style.ChildBorderSize = 0.0f;
+
+    ImVec4* style_colors = style.Colors;
+
+    if ( state.light_mode )
+    {
+        style_colors [ ImGuiCol_WindowBg ] = ImVec4( 0.94f , 0.94f , 0.95f , 1.0f );
+        style_colors [ ImGuiCol_ChildBg ] = ImVec4( 0.98f , 0.98f , 0.99f , 1.0f );
+        style_colors [ ImGuiCol_PopupBg ] = ImVec4( 0.98f , 0.98f , 0.99f , 0.98f );
+        style_colors [ ImGuiCol_Border ] = ImVec4( 0.86f , 0.87f , 0.90f , 0.55f );
+        style_colors [ ImGuiCol_TextDisabled ] = ImVec4( 0.45f , 0.47f , 0.52f , 1.0f );
+        style_colors [ ImGuiCol_TableRowBgAlt ] = ImVec4( 0.96f , 0.97f , 0.98f , 1.0f );
+    }
+    else
+    {
+        style_colors [ ImGuiCol_WindowBg ] = ImVec4( 0.10f , 0.10f , 0.11f , 1.00f );
+        style_colors [ ImGuiCol_ChildBg ] = ImVec4( 0.13f , 0.13f , 0.15f , 1.00f );
+        style_colors [ ImGuiCol_PopupBg ] = ImVec4( 0.12f , 0.12f , 0.14f , 0.98f );
+        style_colors [ ImGuiCol_Border ] = ImVec4( 0.22f , 0.23f , 0.28f , 0.45f );
+        style_colors [ ImGuiCol_TextDisabled ] = ImVec4( 0.55f , 0.58f , 0.64f , 1.0f );
+        style_colors [ ImGuiCol_TableRowBgAlt ] = ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
+    }
+
+    style_colors [ ImGuiCol_Header ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.22f : 0.35f );
+    style_colors [ ImGuiCol_HeaderHovered ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.32f : 0.50f );
+    style_colors [ ImGuiCol_HeaderActive ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.42f : 0.65f );
+    style_colors [ ImGuiCol_Button ] = ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.85f : 0.75f );
+    style_colors [ ImGuiCol_ButtonHovered ] = ImVec4( accent.x * 1.05f , accent.y * 1.05f , accent.z * 1.05f , 1.0f );
+    style_colors [ ImGuiCol_ButtonActive ] = ImVec4( accent.x * 0.85f , accent.y * 0.85f , accent.z * 0.85f , 1.0f );
+    style_colors [ ImGuiCol_CheckMark ] = accent;
+    style_colors [ ImGuiCol_SliderGrab ] = accent;
+    style_colors [ ImGuiCol_SliderGrabActive ] = ImVec4( accent.x * 0.9f , accent.y * 0.9f , accent.z * 0.9f , 1.0f );
+    style_colors [ ImGuiCol_Separator ] = style_colors [ ImGuiCol_Border ];
+    style_colors [ ImGuiCol_FrameBg ] = state.light_mode
+        ? ImVec4( 0.90f , 0.91f , 0.93f , 1.0f )
+        : ImVec4( 0.16f , 0.17f , 0.20f , 1.0f );
+    style_colors [ ImGuiCol_FrameBgHovered ] = state.light_mode
+        ? ImVec4( 0.88f , 0.89f , 0.92f , 1.0f )
+        : ImVec4( 0.20f , 0.21f , 0.25f , 1.0f );
+    style_colors [ ImGuiCol_FrameBgActive ] = state.light_mode
+        ? ImVec4( 0.86f , 0.87f , 0.91f , 1.0f )
+        : ImVec4( 0.22f , 0.23f , 0.28f , 1.0f );
+
+    if ( state.font_body )
+    {
+        ImGui::GetIO( ).FontDefault = state.font_body;
+    }
+}

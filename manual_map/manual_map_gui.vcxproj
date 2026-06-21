@@ -46,12 +46,14 @@
     <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
     <TargetName>manual_map_gui</TargetName>
     <ApplicationManifest>src\gui\app.manifest</ApplicationManifest>
+    <ApplicationIcon>src\gui\assets\app_icon.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
     <TargetName>manual_map_gui</TargetName>
     <ApplicationManifest>src\gui\app.manifest</ApplicationManifest>
+    <ApplicationIcon>src\gui\assets\app_icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -65,11 +67,18 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\gui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <PreBuildEvent>
       <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\scripts\ensure-gui-not-running.ps1"</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>if not exist "$(OutDir)assets" mkdir "$(OutDir)assets"
+xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -85,16 +94,26 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;comdlg32.lib;shell32.lib;user32.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\gui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <PreBuildEvent>
       <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\scripts\ensure-gui-not-running.ps1"</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>if not exist "$(OutDir)assets" mkdir "$(OutDir)assets"
+xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\gui\main.cpp" />
     <ClCompile Include="src\gui\gui_app.cpp" />
     <ClCompile Include="src\gui\gui_state.cpp" />
+    <ClCompile Include="src\gui\gui_theme.cpp" />
+    <ClCompile Include="src\gui\gui_widgets.cpp" />
+    <ClCompile Include="src\gui\gui_tray.cpp" />
     <ClCompile Include="src\gui\window_stealth.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
@@ -106,7 +125,14 @@
   <ItemGroup>
     <ClInclude Include="src\gui\gui_app.hpp" />
     <ClInclude Include="src\gui\gui_state.hpp" />
+    <ClInclude Include="src\gui\gui_theme.hpp" />
+    <ClInclude Include="src\gui\gui_widgets.hpp" />
+    <ClInclude Include="src\gui\gui_tray.hpp" />
+    <ClInclude Include="src\gui\resource.h" />
     <ClInclude Include="src\gui\window_stealth.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="src\gui\resources.rc" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="manual_map_core.vcxproj">

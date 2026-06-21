@@ -2,6 +2,7 @@
 
 struct ID3D11Device;
 struct ID3D11DeviceContext;
+struct gui_app_state;
 
 struct app_config;
 
@@ -17,5 +18,7 @@ void gui_app_present( );
 
 void gui_app_set_dll_path( const wchar_t* path );
 app_config* gui_app_config( );
+gui_app_state* gui_app_state_ptr( );
+ID3D11Device* gui_app_device( );
 
 extern void* g_gui_hwnd;

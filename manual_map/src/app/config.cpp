@@ -34,7 +34,7 @@ namespace
 
         while ( !value.empty( ) && ( value.back( ) == L' ' || value.back( ) == L'\t' ) )
         {
-            value.pop_back( );
+            value.pop_back( ) ;
         }
     }
 
@@ -99,6 +99,38 @@ namespace
         return fallback;
     }
 
+    uint32_t parse_uint( const std::wstring& value , uint32_t fallback )
+    {
+        try
+        {
+            return static_cast< uint32_t >( std::stoul( value ) );
+        }
+        catch ( ... )
+        {
+            return fallback;
+        }
+    }
+
+    injection_history_entry* current_history( app_config& config )
+    {
+        if ( config.injection_history.empty( ) )
+        {
+            config.injection_history.push_back( {} );
+        }
+
+        return &config.injection_history.back( );
+    }
+
+    inject_profile* current_profile( app_config& config )
+    {
+        if ( config.profiles.empty( ) )
+        {
+            config.profiles.push_back( {} );
+        }
+
+        return &config.profiles.back( );
+    }
+
     void apply_line( app_config& config , const std::wstring& key , const std::wstring& value )
     {
         if ( key == L"last_dll" )
@@ -160,6 +192,115 @@ namespace
         {
             config.language = value.empty( ) ? L"en" : value;
         }
+        else if ( key == L"light_mode" )
+        {
+            config.light_mode = parse_bool( value , config.light_mode );
+        }
+        else if ( key == L"accent_index" )
+        {
+            config.accent_index = parse_int( value , config.accent_index );
+        }
+        else if ( key == L"compact_mode" )
+        {
+            config.compact_mode = parse_bool( value , config.compact_mode );
+        }
+        else if ( key == L"first_run_complete" )
+        {
+            config.first_run_complete = parse_bool( value , config.first_run_complete );
+        }
+        else if ( key == L"min_to_tray" )
+        {
+            config.min_to_tray = parse_bool( value , config.min_to_tray );
+        }
+        else if ( key == L"watch_folder" )
+        {
+            config.watch_folder = value;
+        }
+        else if ( key == L"favorite_pid" )
+        {
+            config.favorite_pids.push_back( parse_uint( value , 0 ) );
+        }
+        else if ( key == L"queue_dll" )
+        {
+            if ( !value.empty( ) )
+            {
+                config.dll_queue.push_back( value );
+            }
+        }
+        else if ( key == L"show_process_tree" )
+        {
+            config.show_process_tree = parse_bool( value , config.show_process_tree );
+        }
+        else if ( key == L"settings_appearance_open" )
+        {
+            config.settings_appearance_open = parse_bool( value , config.settings_appearance_open );
+        }
+        else if ( key == L"settings_capture_open" )
+        {
+            config.settings_capture_open = parse_bool( value , config.settings_capture_open );
+        }
+        else if ( key == L"settings_injection_open" )
+        {
+            config.settings_injection_open = parse_bool( value , config.settings_injection_open );
+        }
+        else if ( key == L"settings_logging_open" )
+        {
+            config.settings_logging_open = parse_bool( value , config.settings_logging_open );
+        }
+        else if ( key == L"settings_safety_open" )
+        {
+            config.settings_safety_open = parse_bool( value , config.settings_safety_open );
+        }
+        else if ( key == L"settings_profiles_open" )
+        {
+            config.settings_profiles_open = parse_bool( value , config.settings_profiles_open );
+        }
+        else if ( key == L"settings_advanced_open" )
+        {
+            config.settings_advanced_open = parse_bool( value , config.settings_advanced_open );
+        }
+        else if ( key == L"history_target" )
+        {
+            config.injection_history.push_back( {} );
+            current_history( config )->target = value;
+        }
+        else if ( key == L"history_dll" )
+        {
+            current_history( config )->dll = value;
+        }
+        else if ( key == L"history_timestamp" )
+        {
+            current_history( config )->timestamp = value;
+        }
+        else if ( key == L"history_success" )
+        {
+            current_history( config )->success = parse_bool( value , false );
+        }
+        else if ( key == L"profile_name" )
+        {
+            config.profiles.push_back( {} );
+            current_profile( config )->name = value;
+        }
+        else if ( key == L"profile_dll" )
+        {
+            current_profile( config )->dll_path = value;
+        }
+        else if ( key == L"profile_process" )
+        {
+            current_profile( config )->process_name = value;
+        }
+        else if ( key == L"profile_wait" )
+        {
+            current_profile( config )->wait_for_process = parse_bool( value , false );
+        }
+        else if ( key == L"profile_inject_all" )
+        {
+            current_profile( config )->inject_all = parse_bool( value , false );
+        }
+        else if ( key == L"profile_delay" )
+        {
+            current_profile( config )->inject_delay_sec = parse_int( value , 0 );
+        }
     }
 
     bool load_config_stream( std::wistream& file , app_config& config )
@@ -190,6 +331,20 @@ namespace
             apply_line( config , key , value );
         }
 
+        config.profiles.erase(
+            std::remove_if( config.profiles.begin( ) , config.profiles.end( ) , [ ] ( const inject_profile& profile )
+            {
+                return profile.name.empty( );
+            } ) ,
+            config.profiles.end( ) );
+
+        config.injection_history.erase(
+            std::remove_if( config.injection_history.begin( ) , config.injection_history.end( ) , [ ] ( const injection_history_entry& entry )
+            {
+                return entry.target.empty( ) && entry.dll.empty( );
+            } ) ,
+            config.injection_history.end( ) );
+
         return true;
     }
 
@@ -207,6 +362,20 @@ namespace
         file << L"use_allowlist=" << ( config.use_allowlist ? L"1" : L"0" ) << L"\n";
         file << L"cli_notes=" << config.cli_notes << L"\n";
         file << L"language=" << config.language << L"\n";
+        file << L"light_mode=" << ( config.light_mode ? L"1" : L"0" ) << L"\n";
+        file << L"accent_index=" << config.accent_index << L"\n";
+        file << L"compact_mode=" << ( config.compact_mode ? L"1" : L"0" ) << L"\n";
+        file << L"first_run_complete=" << ( config.first_run_complete ? L"1" : L"0" ) << L"\n";
+        file << L"min_to_tray=" << ( config.min_to_tray ? L"1" : L"0" ) << L"\n";
+        file << L"watch_folder=" << config.watch_folder << L"\n";
+        file << L"show_process_tree=" << ( config.show_process_tree ? L"1" : L"0" ) << L"\n";
+        file << L"settings_appearance_open=" << ( config.settings_appearance_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_capture_open=" << ( config.settings_capture_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_injection_open=" << ( config.settings_injection_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_logging_open=" << ( config.settings_logging_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_safety_open=" << ( config.settings_safety_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_profiles_open=" << ( config.settings_profiles_open ? L"1" : L"0" ) << L"\n";
+        file << L"settings_advanced_open=" << ( config.settings_advanced_open ? L"1" : L"0" ) << L"\n";
 
         for ( const auto& item : config.recent_dlls )
         {
@@ -216,6 +385,34 @@ namespace
         for ( const auto& rule : config.process_rules )
         {
             file << L"process_rule=" << rule << L"\n";
+        }
+
+        for ( const auto pid : config.favorite_pids )
+        {
+            file << L"favorite_pid=" << pid << L"\n";
+        }
+
+        for ( const auto& dll : config.dll_queue )
+        {
+            file << L"queue_dll=" << dll << L"\n";
+        }
+
+        for ( const auto& entry : config.injection_history )
+        {
+            file << L"history_timestamp=" << entry.timestamp << L"\n";
+            file << L"history_target=" << entry.target << L"\n";
+            file << L"history_dll=" << entry.dll << L"\n";
+            file << L"history_success=" << ( entry.success ? L"1" : L"0" ) << L"\n";
+        }
+
+        for ( const auto& profile : config.profiles )
+        {
+            file << L"profile_name=" << profile.name << L"\n";
+            file << L"profile_dll=" << profile.dll_path << L"\n";
+            file << L"profile_process=" << profile.process_name << L"\n";
+            file << L"profile_wait=" << ( profile.wait_for_process ? L"1" : L"0" ) << L"\n";
+            file << L"profile_inject_all=" << ( profile.inject_all ? L"1" : L"0" ) << L"\n";
+            file << L"profile_delay=" << profile.inject_delay_sec << L"\n";
         }
     }
 }
@@ -309,4 +506,14 @@ bool is_process_allowed( const app_config& config , const std::wstring& process_
 
     const bool listed = std::any_of( config.process_rules.begin( ) , config.process_rules.end( ) , matches_rule );
     return config.use_allowlist ? listed : !listed;
+}
+
+void add_injection_history( app_config& config , const injection_history_entry& entry )
+{
+    config.injection_history.insert( config.injection_history.begin( ) , entry );
+
+    if ( config.injection_history.size( ) > 20 )
+    {
+        config.injection_history.resize( 20 );
+    }
 }

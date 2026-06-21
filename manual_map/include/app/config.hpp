@@ -1,7 +1,26 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
+
+struct injection_history_entry
+{
+    std::wstring timestamp;
+    std::wstring target;
+    std::wstring dll;
+    bool success = false;
+};
+
+struct inject_profile
+{
+    std::wstring name;
+    std::wstring dll_path;
+    std::wstring process_name;
+    bool wait_for_process = false;
+    bool inject_all = false;
+    int inject_delay_sec = 0;
+};
 
 struct app_config
 {
@@ -21,6 +40,26 @@ struct app_config
     std::vector< std::wstring > process_rules;
     std::wstring cli_notes;
     std::wstring language = L"en";
+
+    bool light_mode = false;
+    int accent_index = 0;
+    bool compact_mode = false;
+    bool first_run_complete = false;
+    bool min_to_tray = false;
+    std::wstring watch_folder;
+    std::vector< uint32_t > favorite_pids;
+    std::vector< injection_history_entry > injection_history;
+    std::vector< inject_profile > profiles;
+    std::vector< std::wstring > dll_queue;
+    bool show_process_tree = false;
+
+    bool settings_appearance_open = true;
+    bool settings_capture_open = true;
+    bool settings_injection_open = true;
+    bool settings_logging_open = true;
+    bool settings_safety_open = true;
+    bool settings_profiles_open = true;
+    bool settings_advanced_open = true;
 };
 
 bool load_config( app_config& config );
@@ -31,3 +70,4 @@ std::wstring default_config_path( );
 void remember_dll( app_config& config , const std::wstring& dll_path );
 void remove_recent_dll( app_config& config , const std::wstring& dll_path );
 bool is_process_allowed( const app_config& config , const std::wstring& process_name );
+void add_injection_history( app_config& config , const injection_history_entry& entry );
