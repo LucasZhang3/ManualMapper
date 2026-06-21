@@ -2,6 +2,7 @@
 
 #include "gui_state.hpp"
 #include "gui_process_icons.hpp"
+#include "gui_shell.hpp"
 #include "gui_theme.hpp"
 #include "gui_widgets.hpp"
 #include "window_stealth.hpp"
@@ -1730,83 +1731,32 @@ void gui_state_save_window( gui_app_state& state , void* hwnd )
 void gui_state_render( gui_app_state& state )
 {
     ImGuiIO& io = ImGui::GetIO( );
-    const auto& tokens = gui_theme_tokens_for( state );
-    const float body_height = io.DisplaySize.y - tokens.title_bar_height - tokens.status_bar_height;
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
-    ImGui::SetNextWindowPos( ImVec2( 0.0f , 0.0f ) );
-    ImGui::SetNextWindowSize( io.DisplaySize );
-    ImGui::Begin(
-        "ManualMapInjector" ,
-        nullptr ,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar );
-
-    const ImVec4 title_bg = state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f );
-    const ImVec4 sidebar_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
-    const ImVec4 status_bg = state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.07f , 0.07f , 0.08f , 1.0f );
-
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 2.0f ) );
-    ImGui::PushStyleColor( ImGuiCol_ChildBg , title_bg );
-    ImGui::BeginChild( "TitleBar" , ImVec2( 0.0f , tokens.title_bar_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-    gui_draw_title_bar( state , g_gui_hwnd );
-    ImGui::EndChild( );
-    ImGui::PopStyleColor( );
-    ImGui::PopStyleVar( );
-
-    ImGui::BeginChild( "BodyRow" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-
-    if ( ImGui::BeginTable( "##shell_layout" , 2 , ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoBordersInBody ) )
-    {
-        ImGui::TableSetupColumn( "Nav" , ImGuiTableColumnFlags_WidthFixed , tokens.sidebar_width );
-        ImGui::TableSetupColumn( "Page" , ImGuiTableColumnFlags_WidthStretch );
-        ImGui::TableNextRow( ImGuiTableRowFlags_None , body_height );
-
-        ImGui::TableSetColumnIndex( 0 );
-        ImGui::PushStyleColor( ImGuiCol_ChildBg , sidebar_bg );
-        ImGui::BeginChild( "Sidebar" , ImVec2( tokens.sidebar_width , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-        gui_draw_sidebar( state );
-        ImGui::EndChild( );
-        ImGui::PopStyleColor( );
-
-        ImGui::TableSetColumnIndex( 1 );
-        ImGui::BeginChild( "MainContent" , ImVec2( 0.0f , body_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
-
-        switch ( state.current_page )
+    gui_shell_render(
+        state ,
+        g_gui_hwnd ,
+        io ,
+        [ & ]()
         {
-        case gui_page::injection:
-            draw_injection_page( state , io );
-            break;
-        case gui_page::history:
-            draw_history_page( state );
-            break;
-        case gui_page::settings:
-            draw_settings_page( state );
-            break;
-        }
-
-        ImGui::PopStyleVar( );
-        ImGui::EndChild( );
-
-        ImGui::EndTable( );
-    }
-
-    ImGui::EndChild( );
-
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 12.0f , 4.0f ) );
-    ImGui::PushStyleColor( ImGuiCol_ChildBg , status_bg );
-    ImGui::BeginChild( "StatusBar" , ImVec2( 0.0f , tokens.status_bar_height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-    gui_draw_status_bar( state );
-    ImGui::EndChild( );
-    ImGui::PopStyleColor( );
-    ImGui::PopStyleVar( );
-
-    draw_confirm_popup( state );
-    gui_draw_command_palette( state );
-    gui_draw_first_run_wizard( state );
-    gui_draw_toasts( state );
-    gui_draw_drag_overlay( state );
-
-    ImGui::End( );
-    ImGui::PopStyleVar( );
+            switch ( state.current_page )
+            {
+            case gui_page::injection:
+                draw_injection_page( state , io );
+                break;
+            case gui_page::history:
+                draw_history_page( state );
+                break;
+            case gui_page::settings:
+                draw_settings_page( state );
+                break;
+            }
+        } ,
+        [ & ]()
+        {
+            draw_confirm_popup( state );
+            gui_draw_command_palette( state );
+            gui_draw_first_run_wizard( state );
+            gui_draw_toasts( state );
+            gui_draw_drag_overlay( state );
+        } );
 }

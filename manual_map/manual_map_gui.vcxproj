@@ -111,6 +111,7 @@ xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Comma
     <ClCompile Include="src\gui\main.cpp" />
     <ClCompile Include="src\gui\gui_app.cpp" />
     <ClCompile Include="src\gui\gui_state.cpp" />
+    <ClCompile Include="src\gui\gui_shell.cpp" />
     <ClCompile Include="src\gui\gui_theme.cpp" />
     <ClCompile Include="src\gui\gui_widgets.cpp" />
     <ClCompile Include="src\gui\gui_process_icons.cpp" />
@@ -126,6 +127,7 @@ xcopy /Y /I "$(ProjectDir)src\gui\assets\app_icon.png" "$(OutDir)assets\"</Comma
   <ItemGroup>
     <ClInclude Include="src\gui\gui_app.hpp" />
     <ClInclude Include="src\gui\gui_state.hpp" />
+    <ClInclude Include="src\gui\gui_shell.hpp" />
     <ClInclude Include="src\gui\gui_theme.hpp" />
     <ClInclude Include="src\gui\gui_widgets.hpp" />
     <ClInclude Include="src\gui\gui_process_icons.hpp" />

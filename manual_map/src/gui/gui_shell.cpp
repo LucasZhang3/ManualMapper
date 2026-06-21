@@ -1,0 +1,409 @@
+#include "gui_shell.hpp"
+#include "gui_app.hpp"
+#include "gui_state.hpp"
+#include "gui_theme.hpp"
+#include "gui_tray.hpp"
+#include "gui_widgets.hpp"
+
+#include <app/inject_service.hpp>
+
+#include <imgui.h>
+
+#include <windows.h>
+#include <windowsx.h>
+
+#include <functional>
+
+namespace
+{
+    constexpr float k_caption_button_w = 46.0f;
+    constexpr int k_resize_border = 8;
+
+    POINT g_drag_anchor {};
+    RECT g_drag_window {};
+    bool g_drag_active = false;
+
+    ImU32 caption_glyph_color( bool light_mode )
+    {
+        return ImGui::GetColorU32( light_mode ? ImVec4( 0.12f , 0.12f , 0.14f , 1.0f ) : ImVec4( 0.92f , 0.92f , 0.94f , 1.0f ) );
+    }
+
+    void draw_minimize_glyph( ImDrawList* draw , const ImVec2& min , const ImVec2& max , ImU32 color )
+    {
+        const float cx = ( min.x + max.x ) * 0.5f;
+        const float cy = ( min.y + max.y ) * 0.5f + 3.0f;
+        draw->AddLine( ImVec2( cx - 5.0f , cy ) , ImVec2( cx + 5.0f , cy ) , color , 1.0f );
+    }
+
+    void draw_maximize_glyph( ImDrawList* draw , const ImVec2& min , const ImVec2& max , ImU32 color )
+    {
+        const float cx = ( min.x + max.x ) * 0.5f;
+        const float cy = ( min.y + max.y ) * 0.5f;
+        draw->AddRect( ImVec2( cx - 5.0f , cy - 4.0f ) , ImVec2( cx + 5.0f , cy + 6.0f ) , color , 0.0f , 0 , 1.0f );
+    }
+
+    void draw_restore_glyph( ImDrawList* draw , const ImVec2& min , const ImVec2& max , ImU32 color )
+    {
+        const float cx = ( min.x + max.x ) * 0.5f;
+        const float cy = ( min.y + max.y ) * 0.5f;
+        draw->AddRect( ImVec2( cx - 2.0f , cy - 6.0f ) , ImVec2( cx + 8.0f , cy + 4.0f ) , color , 0.0f , 0 , 1.0f );
+        draw->AddRect( ImVec2( cx - 8.0f , cy - 2.0f ) , ImVec2( cx + 2.0f , cy + 8.0f ) , color , 0.0f , 0 , 1.0f );
+    }
+
+    void draw_close_glyph( ImDrawList* draw , const ImVec2& min , const ImVec2& max , ImU32 color )
+    {
+        const float cx = ( min.x + max.x ) * 0.5f;
+        const float cy = ( min.y + max.y ) * 0.5f;
+        draw->AddLine( ImVec2( cx - 5.0f , cy - 5.0f ) , ImVec2( cx + 5.0f , cy + 5.0f ) , color , 1.0f );
+        draw->AddLine( ImVec2( cx + 5.0f , cy - 5.0f ) , ImVec2( cx - 5.0f , cy + 5.0f ) , color , 1.0f );
+    }
+
+    bool caption_button(
+        const char* id ,
+        const ImVec2& size ,
+        bool close_button ,
+        void ( *draw_glyph )( ImDrawList* , const ImVec2& , const ImVec2& , ImU32 ) ,
+        ImU32 glyph_color )
+    {
+        ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( 1 , 1 , 1 , close_button ? 0.0f : 0.12f ) );
+        ImGui::PushStyleColor(
+            ImGuiCol_ButtonHovered ,
+            close_button ? ImVec4( 0.82f , 0.18f , 0.22f , 1.0f ) : ImVec4( 1 , 1 , 1 , 0.08f ) );
+
+        const bool pressed = ImGui::Button( id , size );
+        const ImVec2 min = ImGui::GetItemRectMin( );
+        const ImVec2 max = ImGui::GetItemRectMax( );
+        ImDrawList* draw = ImGui::GetWindowDrawList( );
+
+        if ( close_button && ImGui::IsItemHovered( ) )
+        {
+            glyph_color = IM_COL32( 255 , 255 , 255 , 255 );
+        }
+
+        draw_glyph( draw , min , max , glyph_color );
+        ImGui::PopStyleColor( 3 );
+        return pressed;
+    }
+
+    void handle_title_drag( HWND window )
+    {
+        if ( ImGui::IsItemActivated( ) )
+        {
+            GetCursorPos( &g_drag_anchor );
+            GetWindowRect( window , &g_drag_window );
+            g_drag_active = true;
+        }
+
+        if ( !ImGui::IsItemActive( ) )
+        {
+            g_drag_active = false;
+            return;
+        }
+
+        if ( !g_drag_active || !ImGui::IsMouseDragging( ImGuiMouseButton_Left ) )
+        {
+            return;
+        }
+
+        POINT cursor {};
+        GetCursorPos( &cursor );
+        SetWindowPos(
+            window ,
+            nullptr ,
+            g_drag_window.left + ( cursor.x - g_drag_anchor.x ) ,
+            g_drag_window.top + ( cursor.y - g_drag_anchor.y ) ,
+            0 ,
+            0 ,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE );
+    }
+
+    void draw_title_bar( gui_app_state& state , HWND window , float width , float height )
+    {
+        const ImU32 glyph = caption_glyph_color( state.light_mode );
+        const float buttons_w = k_caption_button_w * 3.0f;
+        const ImVec2 origin = ImGui::GetCursorScreenPos( );
+        ImDrawList* draw = ImGui::GetWindowDrawList( );
+
+        float label_x = origin.x + 10.0f;
+        const float icon_size = height - 10.0f;
+
+        if ( state.app_icon_texture )
+        {
+            draw->AddImage(
+                state.app_icon_texture ,
+                ImVec2( label_x , origin.y + 5.0f ) ,
+                ImVec2( label_x + icon_size , origin.y + 5.0f + icon_size ) );
+            label_x += icon_size + 8.0f;
+        }
+
+        if ( state.font_header )
+        {
+            ImGui::PushFont( state.font_header );
+        }
+
+        draw->AddText(
+            ImVec2( label_x , origin.y + ( height - ImGui::GetTextLineHeight( ) ) * 0.5f ) ,
+            ImGui::GetColorU32( ImGuiCol_Text ) ,
+            "Manual Map Injector" );
+
+        if ( state.font_header )
+        {
+            ImGui::PopFont( );
+        }
+
+        ImGui::SetCursorScreenPos( origin );
+        ImGui::InvisibleButton( "##shell_drag" , ImVec2( width - buttons_w , height ) );
+        handle_title_drag( window );
+
+        ImGui::SetCursorScreenPos( ImVec2( origin.x + width - buttons_w , origin.y ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing , ImVec2( 0.0f , 0.0f ) );
+
+        if ( caption_button( "##shell_min" , ImVec2( k_caption_button_w , height ) , false , draw_minimize_glyph , glyph ) )
+        {
+            if ( state.config.min_to_tray )
+            {
+                gui_tray_minimize_to_tray( window );
+            }
+            else
+            {
+                ShowWindow( window , SW_MINIMIZE );
+            }
+        }
+
+        ImGui::SameLine( 0.0f , 0.0f );
+
+        const bool maximized = IsZoomed( window ) != FALSE;
+        state.window_maximized = maximized;
+
+        if ( caption_button(
+                "##shell_max" ,
+                ImVec2( k_caption_button_w , height ) ,
+                false ,
+                maximized ? draw_restore_glyph : draw_maximize_glyph ,
+                glyph ) )
+        {
+            ShowWindow( window , maximized ? SW_RESTORE : SW_MAXIMIZE );
+        }
+
+        ImGui::SameLine( 0.0f , 0.0f );
+
+        if ( caption_button( "##shell_close" , ImVec2( k_caption_button_w , height ) , true , draw_close_glyph , glyph ) )
+        {
+            PostMessageW( window , WM_CLOSE , 0 , 0 );
+        }
+
+        ImGui::PopStyleVar( );
+    }
+
+    void draw_sidebar_nav( gui_app_state& state )
+    {
+        const auto& tokens = gui_theme_tokens_for( state );
+
+        struct nav_item { gui_page page; const char* label; };
+        static const nav_item items [ ] =
+        {
+            { gui_page::injection , "Injection" } ,
+            { gui_page::history , "History" } ,
+            { gui_page::settings , "Settings" }
+        };
+
+        ImGui::Spacing( );
+
+        for ( const auto& item : items )
+        {
+            const bool selected = state.current_page == item.page;
+            ImGui::PushStyleColor( ImGuiCol_Header , selected ? gui_theme_accent_muted( state.config.accent_index , state.light_mode ) : ImVec4( 0 , 0 , 0 , 0 ) );
+            ImGui::PushStyleColor( ImGuiCol_HeaderHovered , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.05f : 0.06f ) );
+            ImGui::PushStyleColor( ImGuiCol_HeaderActive , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.08f : 0.10f ) );
+
+            if ( ImGui::Selectable( item.label , selected , 0 , ImVec2( -1.0f , tokens.row_height * 0.75f ) ) )
+            {
+                state.current_page = item.page;
+            }
+
+            ImGui::PopStyleColor( 3 );
+        }
+    }
+
+    void draw_status_bar_content( gui_app_state& state )
+    {
+        std::string target = "No target";
+
+        if ( state.selected_pid > 0 )
+        {
+            for ( const auto& process : state.all_processes )
+            {
+                if ( static_cast< int >( process.pid ) == state.selected_pid )
+                {
+                    target = std::to_string( process.pid ) + " " + [ ] ( const std::wstring& name )
+                    {
+                        if ( name.empty( ) )
+                        {
+                            return std::string {};
+                        }
+
+                        const int length = WideCharToMultiByte( CP_UTF8 , 0 , name.c_str( ) , -1 , nullptr , 0 , nullptr , nullptr );
+
+                        if ( length <= 0 )
+                        {
+                            return std::string {};
+                        }
+
+                        std::string utf8( static_cast< size_t >( length - 1 ) , '\0' );
+                        WideCharToMultiByte( CP_UTF8 , 0 , name.c_str( ) , -1 , utf8.data( ) , length , nullptr , nullptr );
+                        return utf8;
+                    }( process.name );
+                    break;
+                }
+            }
+        }
+        else if ( state.search [ 0 ] )
+        {
+            target = state.search;
+        }
+
+        const bool elevated = is_process_elevated( );
+        const float width = ImGui::GetWindowWidth( );
+        ImGui::AlignTextToFramePadding( );
+        ImGui::TextUnformatted( state.status.c_str( ) );
+        ImGui::SameLine( width * 0.34f );
+        ImGui::TextDisabled( "%s" , target.c_str( ) );
+        ImGui::SameLine( width - 96.0f );
+        ImGui::TextColored(
+            elevated ? gui_theme_accent( state.config.accent_index ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ,
+            elevated ? "Admin" : "Standard" );
+    }
+
+    void begin_shell_child( const char* id , const ImVec2& pos , const ImVec2& size , const ImVec4& bg )
+    {
+        ImGui::SetCursorPos( pos );
+        ImGui::PushStyleColor( ImGuiCol_ChildBg , bg );
+        ImGui::BeginChild( id , size , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+    }
+
+    void end_shell_child( )
+    {
+        ImGui::EndChild( );
+        ImGui::PopStyleColor( );
+    }
+}
+
+LRESULT gui_shell_hit_test( HWND hwnd , LPARAM lparam )
+{
+    float title_h = 36.0f;
+
+    if ( gui_app_state* state = gui_app_state_ptr( ) )
+    {
+        title_h = gui_theme_tokens_for( *state ).title_bar_height;
+    }
+
+    POINT point { GET_X_LPARAM( lparam ) , GET_Y_LPARAM( lparam ) };
+    ScreenToClient( hwnd , &point );
+
+    RECT client {};
+    GetClientRect( hwnd , &client );
+
+    if ( point.y < static_cast< LONG >( title_h ) )
+    {
+        return HTCLIENT;
+    }
+
+    const bool on_left = point.x < k_resize_border;
+    const bool on_right = point.x >= client.right - k_resize_border;
+    const bool on_bottom = point.y >= client.bottom - k_resize_border;
+
+    if ( on_bottom && on_left )
+    {
+        return HTBOTTOMLEFT;
+    }
+
+    if ( on_bottom && on_right )
+    {
+        return HTBOTTOMRIGHT;
+    }
+
+    if ( on_bottom )
+    {
+        return HTBOTTOM;
+    }
+
+    if ( on_left )
+    {
+        return HTLEFT;
+    }
+
+    if ( on_right )
+    {
+        return HTRIGHT;
+    }
+
+    return HTCLIENT;
+}
+
+void gui_shell_render(
+    gui_app_state& state ,
+    void* hwnd ,
+    ImGuiIO& io ,
+    const std::function< void( ) >& render_page ,
+    const std::function< void( ) >& render_overlays )
+{
+    const auto& tokens = gui_theme_tokens_for( state );
+    const HWND window = static_cast< HWND >( hwnd );
+    const ImVec2 display = io.DisplaySize;
+
+    const float title_h = tokens.title_bar_height;
+    const float status_h = tokens.status_bar_height;
+    const float sidebar_w = tokens.sidebar_width;
+    const float body_h = display.y - title_h - status_h;
+    const float main_w = display.x - sidebar_w;
+
+    const ImVec4 title_bg = state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f );
+    const ImVec4 sidebar_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
+    const ImVec4 status_bg = state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.07f , 0.07f , 0.08f , 1.0f );
+
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
+    ImGui::SetNextWindowPos( ImVec2( 0.0f , 0.0f ) );
+    ImGui::SetNextWindowSize( display );
+    ImGui::Begin(
+        "ManualMapInjector" ,
+        nullptr ,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar );
+
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
+    begin_shell_child( "##shell_title" , ImVec2( 0.0f , 0.0f ) , ImVec2( display.x , title_h ) , title_bg );
+    draw_title_bar( state , window , display.x , title_h );
+    end_shell_child( );
+    ImGui::PopStyleVar( );
+
+    begin_shell_child( "##shell_sidebar" , ImVec2( 0.0f , title_h ) , ImVec2( sidebar_w , body_h ) , sidebar_bg );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 8.0f ) );
+    draw_sidebar_nav( state );
+    ImGui::PopStyleVar( );
+    end_shell_child( );
+
+    begin_shell_child( "##shell_main" , ImVec2( sidebar_w , title_h ) , ImVec2( main_w , body_h ) , ImGui::GetStyleColorVec4( ImGuiCol_WindowBg ) );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
+
+    if ( render_page )
+    {
+        render_page( );
+    }
+
+    ImGui::PopStyleVar( );
+    end_shell_child( );
+
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 12.0f , 5.0f ) );
+    begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
+    draw_status_bar_content( state );
+    end_shell_child( );
+    ImGui::PopStyleVar( );
+
+    if ( render_overlays )
+    {
+        render_overlays( );
+    }
+
+    ImGui::End( );
+    ImGui::PopStyleVar( );
+}

@@ -1,7 +1,7 @@
 #include "gui_app.hpp"
 #include "gui_tray.hpp"
+#include "gui_shell.hpp"
 #include "gui_state.hpp"
-#include "gui_theme.hpp"
 #include "resource.h"
 
 #include <app/config.hpp>
@@ -31,64 +31,6 @@ namespace
         DwmExtendFrameIntoClientArea( hwnd , &margins );
     }
 
-    LRESULT hit_test_borderless( HWND hwnd , LPARAM lparam )
-    {
-        float title_h = 36.0f;
-        float status_h = 26.0f;
-
-        if ( gui_app_state* state = gui_app_state_ptr( ) )
-        {
-            const auto& tokens = gui_theme_tokens_for( *state );
-            title_h = tokens.title_bar_height;
-            status_h = tokens.status_bar_height;
-        }
-
-        POINT point { GET_X_LPARAM( lparam ) , GET_Y_LPARAM( lparam ) };
-        ScreenToClient( hwnd , &point );
-
-        RECT client_rect {};
-        GetClientRect( hwnd , &client_rect );
-
-        constexpr LONG border = 6;
-
-        if ( point.y < static_cast< LONG >( title_h ) )
-        {
-            return HTCLIENT;
-        }
-
-        if ( point.y >= client_rect.bottom - static_cast< LONG >( status_h ) )
-        {
-            return HTCLIENT;
-        }
-
-        if ( point.y >= client_rect.bottom - border )
-        {
-            if ( point.x < border )
-            {
-                return HTBOTTOMLEFT;
-            }
-
-            if ( point.x >= client_rect.right - border )
-            {
-                return HTBOTTOMRIGHT;
-            }
-
-            return HTBOTTOM;
-        }
-
-        if ( point.x < border )
-        {
-            return HTLEFT;
-        }
-
-        if ( point.x >= client_rect.right - border )
-        {
-            return HTRIGHT;
-        }
-
-        return HTCLIENT;
-    }
-
     LRESULT WINAPI window_proc( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam )
     {
         if ( gui_tray_handle_message( hwnd , msg , wparam , lparam ) )
@@ -111,7 +53,7 @@ namespace
 
             break;
         case WM_NCHITTEST:
-            return hit_test_borderless( hwnd , lparam );
+            return gui_shell_hit_test( hwnd , lparam );
         case WM_GETMINMAXINFO:
         {
             auto* min_max = reinterpret_cast< MINMAXINFO* >( lparam );
@@ -188,7 +130,7 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
     const int window_w = config.window_w > 0 ? config.window_w : 1280;
     const int window_h = config.window_h > 0 ? config.window_h : 720;
 
-    const DWORD window_style = WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+    const DWORD window_style = WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
 
     HWND hwnd = CreateWindowW(
         window_class.lpszClassName ,
