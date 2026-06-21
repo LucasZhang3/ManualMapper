@@ -27,8 +27,21 @@ namespace
         BOOL use_immersive_dark = TRUE;
         DwmSetWindowAttribute( hwnd , 20 , &use_immersive_dark , sizeof( use_immersive_dark ) );
 
+        enum DWM_WINDOW_CORNER_PREFERENCE { DWMWCP_DEFAULT = 0 , DWMWCP_DONOTROUND = 1 , DWMWCP_ROUND = 2 , DWMWCP_ROUNDSMALL = 3 };
+        constexpr DWORD k_corner_preference_attr = 33;
+        const DWM_WINDOW_CORNER_PREFERENCE round_corners = DWMWCP_ROUND;
+        DwmSetWindowAttribute( hwnd , k_corner_preference_attr , &round_corners , sizeof( round_corners ) );
+
         MARGINS margins { 0 , 0 , 0 , 0 };
         DwmExtendFrameIntoClientArea( hwnd , &margins );
+    }
+
+    void update_window_corners( HWND hwnd , bool maximized )
+    {
+        enum DWM_WINDOW_CORNER_PREFERENCE { DWMWCP_DEFAULT = 0 , DWMWCP_DONOTROUND = 1 , DWMWCP_ROUND = 2 , DWMWCP_ROUNDSMALL = 3 };
+        constexpr DWORD k_corner_preference_attr = 33;
+        const DWM_WINDOW_CORNER_PREFERENCE preference = maximized ? DWMWCP_DONOTROUND : DWMWCP_ROUND;
+        DwmSetWindowAttribute( hwnd , k_corner_preference_attr , &preference , sizeof( preference ) );
     }
 
     LRESULT WINAPI window_proc( HWND hwnd , UINT msg , WPARAM wparam , LPARAM lparam )
@@ -68,7 +81,9 @@ namespace
 
                 if ( gui_app_state_ptr( ) )
                 {
-                    gui_app_state_ptr( )->window_maximized = wparam == SIZE_MAXIMIZED;
+                    const bool maximized = wparam == SIZE_MAXIMIZED;
+                    gui_app_state_ptr( )->window_maximized = maximized;
+                    update_window_corners( hwnd , maximized );
                 }
             }
 
@@ -162,6 +177,7 @@ int WINAPI wWinMain( HINSTANCE instance , HINSTANCE , PWSTR , int show_command )
 
     ShowWindow( hwnd , show_command );
     UpdateWindow( hwnd );
+    update_window_corners( hwnd , show_command == SW_SHOWMAXIMIZED );
 
     if ( !gui_app_init( ) )
     {

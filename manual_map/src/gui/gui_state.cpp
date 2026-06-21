@@ -573,6 +573,11 @@ namespace
             return false;
         }
 
+        if ( !enabled && capture_stealth_active( g_gui_hwnd ) )
+        {
+            apply_capture_stealth( g_gui_hwnd , false , nullptr );
+        }
+
         state.stealth_capture = enabled;
         state.config.stealth_capture = enabled;
         save_config( state.config );
@@ -647,13 +652,15 @@ namespace
         ImGui::NewLine( );
     }
 
-    void draw_process_list( gui_app_state& state , const std::vector< process_entry >& visible , float height )
+    void draw_process_list( gui_app_state& state , const std::vector< process_entry >& visible , float height , float density_scale = 1.0f )
     {
         const auto& tokens = gui_theme_tokens_for( state );
-        ImGui::BeginChild( "ProcessList" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        const float inner_pad = tokens.card_inner_padding * density_scale;
+        const float row_height = tokens.row_height * density_scale;
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( inner_pad , inner_pad * 0.5f ) );
+        ImGui::BeginChild( "ProcessList" , ImVec2( -1.0f , height ) , ImGuiChildFlags_Borders , ImGuiWindowFlags_NoScrollbar );
 
         const float content_width = ImGui::GetContentRegionAvail( ).x;
-        const float row_height = tokens.row_height;
         ImDrawList* draw = ImGui::GetWindowDrawList( );
         const ImU32 text_color = ImGui::GetColorU32( ImGuiCol_Text );
         const ImU32 header_bg = ImGui::GetColorU32( state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.11f , 0.12f , 0.14f , 1.0f ) );
@@ -661,7 +668,8 @@ namespace
         const ImVec2 header_min = ImGui::GetCursorScreenPos( );
         draw->AddRectFilled( header_min , ImVec2( header_min.x + content_width , header_min.y + row_height ) , header_bg );
         const float header_text_y = header_min.y + ( row_height - ImGui::GetTextLineHeight( ) ) * 0.5f;
-        draw->AddText( ImVec2( header_min.x + 40.0f , header_text_y ) , text_color , "Process" );
+        const float header_icon_col = 8.0f + 24.0f * density_scale;
+        draw->AddText( ImVec2( header_min.x + header_icon_col , header_text_y ) , text_color , "Process" );
         draw->AddText( ImVec2( header_min.x + content_width - 120.0f , header_text_y ) , text_color , "PID / Arch" );
         ImGui::Dummy( ImVec2( 0.0f , row_height ) );
 
@@ -670,6 +678,7 @@ namespace
             ImGui::Spacing( );
             ImGui::TextDisabled( "No matching processes. Press F5 to refresh." );
             ImGui::EndChild( );
+            ImGui::PopStyleVar( );
             return;
         }
 
@@ -715,27 +724,29 @@ namespace
 
                 const float text_y = item_min.y + ( item_max.y - item_min.y - ImGui::GetTextLineHeight( ) ) * 0.5f;
                 const ImTextureID process_icon = process_icons_get( process.exe_path );
-                const float icon_y = item_min.y + ( row_height - 24.0f ) * 0.5f;
+                const float icon_size = 24.0f * density_scale;
+                const float icon_y = item_min.y + ( row_height - icon_size ) * 0.5f;
 
                 if ( process_icon )
                 {
-                    draw->AddImage( process_icon , ImVec2( item_min.x + 4.0f , icon_y ) , ImVec2( item_min.x + 28.0f , icon_y + 24.0f ) );
+                    draw->AddImage( process_icon , ImVec2( item_min.x + 4.0f , icon_y ) , ImVec2( item_min.x + 4.0f + icon_size , icon_y + icon_size ) );
                 }
                 else
                 {
                     const char letter = avatar_letter( process.name );
                     const ImVec4 accent = gui_theme_accent( state.config.accent_index );
-                    draw->AddCircleFilled( ImVec2( item_min.x + 16.0f , item_min.y + row_height * 0.5f ) , 12.0f , ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.35f ) ) );
+                    const float avatar_r = 12.0f * density_scale;
+                    draw->AddCircleFilled( ImVec2( item_min.x + 4.0f + avatar_r , item_min.y + row_height * 0.5f ) , avatar_r , ImGui::GetColorU32( ImVec4( accent.x , accent.y , accent.z , 0.35f ) ) );
                     char letter_buf [ 2 ] = { letter , '\0' };
-                    draw->AddText( ImVec2( item_min.x + 11.0f , text_y ) , text_color , letter_buf );
+                    draw->AddText( ImVec2( item_min.x + 4.0f + avatar_r - ImGui::CalcTextSize( letter_buf ).x * 0.5f , text_y ) , text_color , letter_buf );
                 }
 
                 const std::string name_utf8 = wide_to_utf8( process.name );
-                draw->AddText( ImVec2( item_min.x + 36.0f , text_y ) , text_color , name_utf8.c_str( ) );
+                draw->AddText( ImVec2( item_min.x + 8.0f + icon_size , text_y ) , text_color , name_utf8.c_str( ) );
 
                 const std::string meta = std::to_string( process.pid ) + "  " + ( process.is_wow64 ? "x86" : "x64" );
                 const ImVec2 meta_size = ImGui::CalcTextSize( meta.c_str( ) );
-                draw->AddText( ImVec2( item_max.x - meta_size.x - 8.0f , text_y ) , ImGui::GetColorU32( ImGuiCol_TextDisabled ) , meta.c_str( ) );
+                draw->AddText( ImVec2( item_max.x - meta_size.x - inner_pad , text_y ) , ImGui::GetColorU32( ImGuiCol_TextDisabled ) , meta.c_str( ) );
 
                 if ( clicked )
                 {
@@ -779,39 +790,10 @@ namespace
         }
 
         ImGui::EndChild( );
+        ImGui::PopStyleVar( );
     }
 
-    void draw_injection_summary( gui_app_state& state )
-    {
-        ImGui::PushStyleColor( ImGuiCol_ChildBg , gui_theme_accent_muted( state.config.accent_index , state.light_mode ) );
-        ImGui::BeginChild( "InjectSummary" , ImVec2( -1.0f , 88.0f ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-        ImGui::TextUnformatted( "Injection Summary" );
-        ImGui::Text( "Target: %s" , state.selected_pid > 0 ? selected_process_label( state ).c_str( ) : ( state.search [ 0 ] ? state.search : "None" ) );
-
-        bool arch_match = true;
-
-        if ( state.dll_pe.valid && state.selected_pid > 0 )
-        {
-            for ( const auto& process : state.all_processes )
-            {
-                if ( static_cast< int >( process.pid ) == state.selected_pid )
-                {
-                    const bool dll_x64 = state.dll_pe.is_64bit;
-                    const bool proc_x64 = !process.is_wow64;
-                    arch_match = dll_x64 == proc_x64;
-                    ImGui::TextColored( arch_match ? ImVec4( 0.3f , 0.85f , 0.45f , 1.0f ) : ImVec4( 0.95f , 0.35f , 0.35f , 1.0f ) , "Arch match: %s" , arch_match ? "Yes" : "No" );
-                    break;
-                }
-            }
-        }
-
-        ImGui::TextWrapped( "DLL: %s" , state.dll_path [ 0 ] ? state.dll_path : "(none)" );
-        ImGui::EndChild( );
-        ImGui::PopStyleColor( );
-        ImGui::Spacing( );
-    }
-
-    void draw_recent_dll_cards( gui_app_state& state )
+    void draw_recent_dll_cards( gui_app_state& state , float density_scale )
     {
         if ( state.config.recent_dlls.empty( ) )
         {
@@ -822,6 +804,9 @@ namespace
         ImGui::Spacing( );
 
         const std::wstring current_dll = utf8_to_wide( state.dll_path );
+        const auto& tokens = gui_theme_tokens_for( state );
+        const float inner_pad = tokens.card_inner_padding * density_scale;
+        const float card_height = 62.0f * density_scale;
 
         for ( int idx = 0; idx < static_cast< int >( state.config.recent_dlls.size( ) ); ++idx )
         {
@@ -833,7 +818,6 @@ namespace
 
             ImGui::PushID( idx );
             const float card_width = ImGui::GetContentRegionAvail( ).x;
-            const float card_height = 56.0f;
             const ImVec2 card_pos = ImGui::GetCursorScreenPos( );
 
             ImGui::InvisibleButton( "##dll_card" , ImVec2( card_width - 36.0f , card_height ) );
@@ -847,12 +831,13 @@ namespace
             ImDrawList* draw_list = ImGui::GetWindowDrawList( );
             const ImU32 bg = ImGui::GetColorU32( is_active ? gui_theme_accent_muted( state.config.accent_index , state.light_mode ) : ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
             draw_list->AddRectFilled( card_pos , ImVec2( card_pos.x + card_width - 36.0f , card_pos.y + card_height ) , bg , 6.0f );
-            draw_list->AddText( ImVec2( card_pos.x + 10.0f , card_pos.y + 8.0f ) , ImGui::GetColorU32( ImGuiCol_Text ) , filename.c_str( ) );
+            draw_list->AddRect( card_pos , ImVec2( card_pos.x + card_width - 36.0f , card_pos.y + card_height ) , ImGui::GetColorU32( ImGuiCol_Border ) , 6.0f );
+            draw_list->AddText( ImVec2( card_pos.x + inner_pad , card_pos.y + inner_pad ) , ImGui::GetColorU32( ImGuiCol_Text ) , filename.c_str( ) );
 
             if ( pe.valid )
             {
                 const std::string badge = wide_to_utf8( pe.machine_label );
-                draw_list->AddText( ImVec2( card_pos.x + card_width - 90.0f , card_pos.y + 10.0f ) , ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) , badge.c_str( ) );
+                draw_list->AddText( ImVec2( card_pos.x + card_width - 90.0f , card_pos.y + inner_pad ) , ImGui::GetColorU32( gui_theme_accent( state.config.accent_index ) ) , badge.c_str( ) );
             }
 
             ImGui::SameLine( 0.0f , 0.0f );
@@ -923,6 +908,9 @@ namespace
 
     void draw_log_panel( gui_app_state& state , float height )
     {
+        const auto& tokens = gui_theme_tokens_for( state );
+        const float inner_pad = tokens.card_inner_padding;
+
         ImGui::TextUnformatted( "Output Log" );
         ImGui::SetNextItemWidth( 160.0f );
         ImGui::InputTextWithHint( "##logfilter" , "Filter tags..." , state.log_filter , sizeof( state.log_filter ) );
@@ -955,7 +943,8 @@ namespace
             log_copy = state.log;
         }
 
-        ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , height ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( inner_pad , inner_pad ) );
+        ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , height ) , ImGuiChildFlags_Borders , gui_child_scroll_flags( ) );
 
         if ( state.font_mono )
         {
@@ -1005,23 +994,41 @@ namespace
         }
 
         ImGui::EndChild( );
+        ImGui::PopStyleVar( );
     }
 
     void draw_injection_page( gui_app_state& state , ImGuiIO& io )
     {
         ( void )io;
+        constexpr float k_left_density = 0.875f;
+        constexpr float k_left_pad_scale = 0.85f;
+        constexpr float k_target_panel_share = 0.62f;
+        constexpr float k_left_section_gap = 10.0f;
+
         const float content_w = ImGui::GetContentRegionAvail( ).x;
         const float content_h = ImGui::GetContentRegionAvail( ).y;
         const float action_row_h = 44.0f;
         const float panels_h = ( std::max )( 120.0f , content_h - action_row_h );
         const float left_width = ( std::max )( 220.0f , content_w * state.panel_split );
+        const float target_panel_h = ( panels_h - k_left_section_gap ) * k_target_panel_share;
+        const float payload_panel_h = panels_h - k_left_section_gap - target_panel_h;
+        const auto& tokens = gui_theme_tokens_for( state );
+        const float target_inner_pad = tokens.card_inner_padding * k_left_pad_scale;
 
-        ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , panels_h ) , ImGuiChildFlags_None , gui_child_scroll_flags( ) );
-        draw_injection_summary( state );
+        ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , panels_h ) , ImGuiChildFlags_None , ImGuiWindowFlags_NoScrollbar );
 
-        if ( gui_begin_section_card( "TargetCard" , "Target Process" , true , nullptr ) )
-        {
-            ImGui::SetNextItemWidth( -240.0f );
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( target_inner_pad , target_inner_pad ) );
+        ImGui::PushStyleColor( ImGuiCol_ChildBg , ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
+        ImGui::BeginChild( "LeftTargetPanel" , ImVec2( -1.0f , target_panel_h ) , ImGuiChildFlags_Borders , ImGuiWindowFlags_NoScrollbar );
+        ImGui::SetWindowFontScale( k_left_density );
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing , ImVec2( 6.0f , 4.0f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_FramePadding , ImVec2( 7.0f , 3.0f ) );
+
+        ImGui::TextUnformatted( "Target Process" );
+        ImGui::Separator( );
+        ImGui::Spacing( );
+
+        ImGui::SetNextItemWidth( -200.0f );
             ImGui::InputTextWithHint( "##search" , "Search by name or PID..." , state.search , sizeof( state.search ) , ImGuiInputTextFlags_CallbackEdit , search_input_callback );
 
             if ( state.focus_search_next_frame )
@@ -1033,7 +1040,7 @@ namespace
             ImGui::SameLine( );
             const char* sort_labels [ ] = { "Name" , "PID" , "Session" };
             int sort_index = static_cast< int >( state.sort_mode );
-            ImGui::SetNextItemWidth( 90.0f );
+            ImGui::SetNextItemWidth( 80.0f );
 
             if ( ImGui::Combo( "##sort" , &sort_index , sort_labels , IM_ARRAYSIZE( sort_labels ) ) )
             {
@@ -1056,13 +1063,30 @@ namespace
             draw_favorites_strip( state );
             const auto visible = visible_processes( state );
             ImGui::TextDisabled( "%d process(es) shown" , static_cast< int >( visible.size( ) ) );
-            draw_process_list( state , visible , ( std::max )( 120.0f , ImGui::GetContentRegionAvail( ).y * 0.55f ) );
-            gui_end_section_card( );
-        }
 
-        if ( gui_begin_section_card( "PayloadCard" , "DLL Payload" , true , nullptr ) )
+            const float list_h = ImGui::GetContentRegionAvail( ).y;
+
+            if ( list_h > 48.0f )
+            {
+                draw_process_list( state , visible , list_h , k_left_density );
+            }
+
+        ImGui::PopStyleVar( 2 );
+        ImGui::SetWindowFontScale( 1.0f );
+        ImGui::EndChild( );
+        ImGui::PopStyleColor( );
+        ImGui::PopStyleVar( );
+
+        ImGui::Dummy( ImVec2( 0.0f , k_left_section_gap ) );
+
+        ImGui::BeginChild( "LeftPayloadPanel" , ImVec2( -1.0f , payload_panel_h ) , ImGuiChildFlags_Borders , gui_child_scroll_flags( ) );
+        ImGui::SetWindowFontScale( k_left_density );
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing , ImVec2( 6.0f , 4.0f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_FramePadding , ImVec2( 7.0f , 3.0f ) );
+
+        if ( gui_begin_section_card( "PayloadCard" , "DLL Payload" , true , nullptr , k_left_pad_scale ) )
         {
-            draw_recent_dll_cards( state );
+            draw_recent_dll_cards( state , k_left_density );
             ImGui::SetNextItemWidth( -90.0f );
             ImGui::InputText( "##dll_path" , state.dll_path , sizeof( state.dll_path ) );
 
@@ -1088,6 +1112,10 @@ namespace
             draw_pe_preview( state );
             gui_end_section_card( );
         }
+
+        ImGui::PopStyleVar( 2 );
+        ImGui::SetWindowFontScale( 1.0f );
+        ImGui::EndChild( );
 
         ImGui::EndChild( );
 
@@ -1285,7 +1313,10 @@ namespace
 
             if ( gui_draw_pill_toggle( state , "stealth_toggle" , &state.stealth_capture , "Stealth" , "Visible" , "Capture visibility for Discord/OBS." ) )
             {
-                set_stealth_capture( state , state.stealth_capture );
+                if ( !set_stealth_capture( state , state.stealth_capture ) )
+                {
+                    state.stealth_capture = !state.stealth_capture;
+                }
             }
 
             if ( !supported )
@@ -1463,7 +1494,8 @@ namespace
         if ( gui_begin_section_card( "AboutSection" , "About" , true , nullptr ) )
         {
             ImGui::TextUnformatted( "Manual Map Injector v2.0" );
-            ImGui::TextDisabled( "Build: GUI overhaul with profiles, history, tray, command palette" );
+            ImGui::TextDisabled( "Windows manual-map injector for process targeting, payload validation, and configurable injection." );
+            ImGui::TextDisabled( "Press Ctrl+K for quick actions." );
             gui_end_section_card( );
         }
 
@@ -1595,13 +1627,11 @@ void gui_state_init( gui_app_state& state )
     refresh_processes( state );
     append_log( state , "Manual Map Injector ready." );
 
-    if ( state.stealth_capture )
+    if ( !apply_capture_stealth( g_gui_hwnd , state.stealth_capture , nullptr ) && state.stealth_capture )
     {
-        if ( !set_stealth_capture( state , true ) )
-        {
-            state.stealth_capture = false;
-            state.config.stealth_capture = false;
-        }
+        state.stealth_capture = false;
+        state.config.stealth_capture = false;
+        save_config( state.config );
     }
 
     if ( !is_process_elevated( ) )

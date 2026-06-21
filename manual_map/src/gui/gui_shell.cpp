@@ -118,14 +118,14 @@ namespace
             SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE );
     }
 
-    void draw_title_bar( gui_app_state& state , HWND window , float width , float height )
+    void draw_title_bar( gui_app_state& state , HWND window , float width , float height , float side_padding )
     {
         const ImU32 glyph = caption_glyph_color( state.light_mode );
         const float buttons_w = k_caption_button_w * 3.0f;
         const ImVec2 origin = ImGui::GetCursorScreenPos( );
         ImDrawList* draw = ImGui::GetWindowDrawList( );
 
-        float label_x = origin.x + 10.0f;
+        float label_x = origin.x + side_padding;
         const float icon_size = height - 10.0f;
 
         if ( state.app_icon_texture )
@@ -196,34 +196,70 @@ namespace
         ImGui::PopStyleVar( );
     }
 
-    void draw_sidebar_nav( gui_app_state& state )
+    void draw_tab_bar( gui_app_state& state )
     {
         const auto& tokens = gui_theme_tokens_for( state );
-
-        struct nav_item { gui_page page; const char* label; };
-        static const nav_item items [ ] =
+        struct tab_item { gui_page page; const char* label; };
+        static const tab_item items [ ] =
         {
             { gui_page::injection , "Injection" } ,
             { gui_page::history , "History" } ,
             { gui_page::settings , "Settings" }
         };
 
-        ImGui::Spacing( );
+        const ImVec4 accent = gui_theme_accent( state.config.accent_index );
+        const float tab_h = tokens.tab_bar_height - 8.0f;
+        const float text_pad = ( tab_h - ImGui::GetTextLineHeight( ) ) * 0.5f;
+        const float frame_pad_y = text_pad > 0.0f ? text_pad : 0.0f;
 
-        for ( const auto& item : items )
+        ImGui::PushStyleVar( ImGuiStyleVar_FramePadding , ImVec2( 16.0f , frame_pad_y ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing , ImVec2( 6.0f , 0.0f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_FrameRounding , ImGui::GetStyle( ).TabRounding );
+
+        for ( size_t index = 0; index < IM_ARRAYSIZE( items ); ++index )
         {
-            const bool selected = state.current_page == item.page;
-            ImGui::PushStyleColor( ImGuiCol_Header , selected ? gui_theme_accent_muted( state.config.accent_index , state.light_mode ) : ImVec4( 0 , 0 , 0 , 0 ) );
-            ImGui::PushStyleColor( ImGuiCol_HeaderHovered , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.05f : 0.06f ) );
-            ImGui::PushStyleColor( ImGuiCol_HeaderActive , ImVec4( 1 , 1 , 1 , state.light_mode ? 0.08f : 0.10f ) );
+            const auto& item = items [ index ];
 
-            if ( ImGui::Selectable( item.label , selected , 0 , ImVec2( -1.0f , tokens.row_height * 0.75f ) ) )
+            if ( index > 0 )
+            {
+                ImGui::SameLine( );
+            }
+
+            const bool selected = state.current_page == item.page;
+
+            if ( selected )
+            {
+                const ImVec4 selected_bg = gui_theme_accent_muted( state.config.accent_index , state.light_mode );
+                ImGui::PushStyleColor( ImGuiCol_Button , selected_bg );
+                ImGui::PushStyleColor( ImGuiCol_ButtonHovered , selected_bg );
+                ImGui::PushStyleColor( ImGuiCol_ButtonActive , selected_bg );
+            }
+            else
+            {
+                ImGui::PushStyleColor( ImGuiCol_Button , ImVec4( 0 , 0 , 0 , 0 ) );
+                ImGui::PushStyleColor( ImGuiCol_ButtonHovered , ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.12f : 0.18f ) );
+                ImGui::PushStyleColor( ImGuiCol_ButtonActive , ImVec4( accent.x , accent.y , accent.z , state.light_mode ? 0.18f : 0.24f ) );
+            }
+
+            if ( ImGui::Button( item.label , ImVec2( 0.0f , tab_h ) ) )
             {
                 state.current_page = item.page;
             }
 
             ImGui::PopStyleColor( 3 );
         }
+
+        ImGui::PopStyleVar( 3 );
+    }
+
+    void draw_shell_background( const ImVec2& display , float rounding )
+    {
+        const ImVec2 origin = ImGui::GetWindowPos( );
+        ImGui::GetWindowDrawList( )->AddRectFilled(
+            origin ,
+            ImVec2( origin.x + display.x , origin.y + display.y ) ,
+            ImGui::GetColorU32( ImGuiCol_WindowBg ) ,
+            rounding );
     }
 
     void draw_status_bar_content( gui_app_state& state )
@@ -264,15 +300,21 @@ namespace
         }
 
         const bool elevated = is_process_elevated( );
-        const float width = ImGui::GetWindowWidth( );
+        const auto& tokens = gui_theme_tokens_for( state );
+        const float content_width = ImGui::GetContentRegionAvail( ).x;
+        const float right_gutter = tokens.shell_padding * 0.5f;
         ImGui::AlignTextToFramePadding( );
         ImGui::TextUnformatted( state.status.c_str( ) );
-        ImGui::SameLine( width * 0.34f );
+        ImGui::SameLine( content_width * 0.34f );
         ImGui::TextDisabled( "%s" , target.c_str( ) );
-        ImGui::SameLine( width - 96.0f );
+
+        const char* privilege_label = elevated ? "Admin" : "Standard";
+        const ImVec2 privilege_size = ImGui::CalcTextSize( privilege_label );
+        ImGui::SameLine( content_width - privilege_size.x - right_gutter );
         ImGui::TextColored(
             elevated ? gui_theme_accent( state.config.accent_index ) : ImGui::GetStyleColorVec4( ImGuiCol_TextDisabled ) ,
-            elevated ? "Admin" : "Standard" );
+            "%s" ,
+            privilege_label );
     }
 
     void begin_shell_child( const char* id , const ImVec2& pos , const ImVec2& size , const ImVec4& bg )
@@ -353,13 +395,17 @@ void gui_shell_render(
     const ImVec2 display = io.DisplaySize;
 
     const float title_h = tokens.title_bar_height;
+    const float tab_h = tokens.tab_bar_height;
     const float status_h = tokens.status_bar_height;
-    const float sidebar_w = tokens.sidebar_width;
-    const float body_h = display.y - title_h - status_h;
-    const float main_w = display.x - sidebar_w;
+    const float side_pad = tokens.shell_padding;
+    const float content_y = title_h + tab_h;
+    const float content_h = display.y - content_y - status_h;
+    const float inner_w = display.x - side_pad * 2.0f;
+    const float rounding = state.window_maximized ? 0.0f : ImGui::GetStyle( ).WindowRounding;
+    const ImVec2 content_padding( side_pad , tokens.card_padding );
 
     const ImVec4 title_bg = state.light_mode ? ImVec4( 0.98f , 0.98f , 0.99f , 1.0f ) : ImVec4( 0.08f , 0.08f , 0.09f , 1.0f );
-    const ImVec4 sidebar_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.11f , 0.11f , 0.12f , 1.0f );
+    const ImVec4 tab_bg = state.light_mode ? ImVec4( 0.96f , 0.96f , 0.97f , 1.0f ) : ImVec4( 0.10f , 0.10f , 0.11f , 1.0f );
     const ImVec4 status_bg = state.light_mode ? ImVec4( 0.92f , 0.93f , 0.95f , 1.0f ) : ImVec4( 0.07f , 0.07f , 0.08f , 1.0f );
 
     ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
@@ -370,20 +416,22 @@ void gui_shell_render(
         nullptr ,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar );
 
+    draw_shell_background( display , rounding );
+
     ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 0.0f ) );
     begin_shell_child( "##shell_title" , ImVec2( 0.0f , 0.0f ) , ImVec2( display.x , title_h ) , title_bg );
-    draw_title_bar( state , window , display.x , title_h );
+    draw_title_bar( state , window , display.x , title_h , side_pad );
     end_shell_child( );
     ImGui::PopStyleVar( );
 
-    begin_shell_child( "##shell_sidebar" , ImVec2( 0.0f , title_h ) , ImVec2( sidebar_w , body_h ) , sidebar_bg );
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 8.0f , 8.0f ) );
-    draw_sidebar_nav( state );
+    begin_shell_child( "##shell_tabs" , ImVec2( side_pad , title_h ) , ImVec2( inner_w , tab_h ) , tab_bg );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 0.0f , 4.0f ) );
+    draw_tab_bar( state );
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    begin_shell_child( "##shell_main" , ImVec2( sidebar_w , title_h ) , ImVec2( main_w , body_h ) , ImGui::GetStyleColorVec4( ImGuiCol_WindowBg ) );
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , tokens.card_padding ) );
+    begin_shell_child( "##shell_main" , ImVec2( side_pad , content_y ) , ImVec2( inner_w , content_h ) , ImGui::GetStyleColorVec4( ImGuiCol_WindowBg ) );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , content_padding );
 
     if ( render_page )
     {
@@ -393,8 +441,8 @@ void gui_shell_render(
     ImGui::PopStyleVar( );
     end_shell_child( );
 
-    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( 12.0f , 5.0f ) );
-    begin_shell_child( "##shell_status" , ImVec2( 0.0f , display.y - status_h ) , ImVec2( display.x , status_h ) , status_bg );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( tokens.card_padding , 6.0f ) );
+    begin_shell_child( "##shell_status" , ImVec2( side_pad , display.y - status_h ) , ImVec2( inner_w , status_h ) , status_bg );
     draw_status_bar_content( state );
     end_shell_child( );
     ImGui::PopStyleVar( );

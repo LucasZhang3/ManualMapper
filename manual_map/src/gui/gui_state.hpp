@@ -109,7 +109,7 @@ struct gui_app_state
     ImFont* font_header = nullptr;
     ImFont* font_mono = nullptr;
     ImTextureID app_icon_texture = 0;
-    float sidebar_width = 180.0f;
+    float tab_bar_height = 36.0f;
     float title_bar_height = 36.0f;
 };
 

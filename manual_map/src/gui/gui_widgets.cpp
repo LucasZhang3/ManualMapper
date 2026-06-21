@@ -1,4 +1,5 @@
 #include "gui_widgets.hpp"
+#include "gui_app.hpp"
 #include "gui_state.hpp"
 #include "gui_theme.hpp"
 #include "window_stealth.hpp"
@@ -112,9 +113,12 @@ bool gui_draw_pill_toggle( gui_app_state& state , const char* id , bool* value ,
 
     ImGui::InvisibleButton( id , ImVec2( width , height ) );
 
+    bool toggled = false;
+
     if ( ImGui::IsItemClicked( ) )
     {
         *value = !*value;
+        toggled = true;
     }
 
     float& anim = state.pill_anim [ widget_id ];
@@ -154,14 +158,23 @@ bool gui_draw_pill_toggle( gui_app_state& state , const char* id , bool* value ,
         gui_draw_help_marker( tooltip );
     }
 
-    return ImGui::IsItemClicked( );
+    return toggled;
 }
 
-bool gui_begin_section_card( const char* id , const char* title , bool default_open , bool* open_state )
+bool gui_begin_section_card( const char* id , const char* title , bool default_open , bool* open_state , float padding_scale )
 {
+    const gui_app_state* app_state = gui_app_state_ptr( );
+    const float base_pad = app_state ? gui_theme_tokens_for( *app_state ).card_inner_padding : 14.0f;
+    const float inner_pad = base_pad * padding_scale;
+
     ImGui::PushStyleVar( ImGuiStyleVar_ChildRounding , 6.0f );
+    ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding , ImVec2( inner_pad , inner_pad ) );
     ImGui::PushStyleColor( ImGuiCol_ChildBg , ImGui::GetStyleColorVec4( ImGuiCol_ChildBg ) );
-    ImGui::BeginChild( id , ImVec2( -1.0f , 0.0f ) , ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize , gui_child_scroll_flags( ) );
+    ImGui::BeginChild(
+        id ,
+        ImVec2( -1.0f , 0.0f ) ,
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize ,
+        gui_child_scroll_flags( ) );
 
     if ( open_state )
     {
@@ -175,7 +188,7 @@ bool gui_begin_section_card( const char* id , const char* title , bool default_o
         {
             ImGui::EndChild( );
             ImGui::PopStyleColor( );
-            ImGui::PopStyleVar( );
+            ImGui::PopStyleVar( 2 );
             return false;
         }
     }
@@ -193,7 +206,7 @@ void gui_end_section_card( )
 {
     ImGui::EndChild( );
     ImGui::PopStyleColor( );
-    ImGui::PopStyleVar( );
+    ImGui::PopStyleVar( 2 );
     ImGui::Spacing( );
 }
 

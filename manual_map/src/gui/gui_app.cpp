@@ -236,9 +236,9 @@ bool gui_app_init( )
     load_config( g_state.config );
     g_state.light_mode = g_state.config.light_mode;
 
-    const float body_size = g_state.config.compact_mode ? 14.0f : 15.0f;
-    const float header_size = body_size + 2.0f;
-    const float mono_size = g_state.config.compact_mode ? 13.0f : 14.0f;
+    const float body_size = g_state.config.compact_mode ? 15.0f : 17.0f;
+    const float header_size = body_size + 3.0f;
+    const float mono_size = g_state.config.compact_mode ? 14.0f : 16.0f;
 
     g_state.font_body = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\segoeui.ttf" , body_size );
     g_state.font_header = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\segoeuib.ttf" , header_size );

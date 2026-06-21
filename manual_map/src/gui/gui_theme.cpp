@@ -36,14 +36,16 @@ ImVec4 gui_theme_accent_muted( int accent_index , bool light_mode )
 
 const gui_theme_tokens& gui_theme_tokens_for( const gui_app_state& state )
 {
-    g_tokens.body_size = state.config.compact_mode ? 14.0f : 15.0f;
-    g_tokens.label_size = state.config.compact_mode ? 12.0f : 13.0f;
-    g_tokens.mono_size = state.config.compact_mode ? 13.0f : 14.0f;
-    g_tokens.title_bar_height = state.config.compact_mode ? 32.0f : 36.0f;
-    g_tokens.sidebar_width = state.config.compact_mode ? 160.0f : 180.0f;
-    g_tokens.status_bar_height = state.config.compact_mode ? 24.0f : 26.0f;
-    g_tokens.row_height = state.config.compact_mode ? 34.0f : 38.0f;
+    g_tokens.body_size = state.config.compact_mode ? 15.0f : 17.0f;
+    g_tokens.label_size = state.config.compact_mode ? 13.0f : 15.0f;
+    g_tokens.mono_size = state.config.compact_mode ? 14.0f : 16.0f;
+    g_tokens.title_bar_height = state.config.compact_mode ? 34.0f : 38.0f;
+    g_tokens.tab_bar_height = state.config.compact_mode ? 34.0f : 38.0f;
+    g_tokens.status_bar_height = state.config.compact_mode ? 26.0f : 28.0f;
+    g_tokens.row_height = state.config.compact_mode ? 40.0f : 44.0f;
+    g_tokens.shell_padding = state.config.compact_mode ? 12.0f : 16.0f;
     g_tokens.card_padding = state.config.compact_mode ? 10.0f : 12.0f;
+    g_tokens.card_inner_padding = state.config.compact_mode ? 12.0f : 14.0f;
     g_tokens.section_spacing = state.config.compact_mode ? 8.0f : 10.0f;
     return g_tokens;
 }
@@ -52,7 +54,7 @@ void gui_theme_init( gui_app_state& state )
 {
     const auto& tokens = gui_theme_tokens_for( state );
     state.title_bar_height = tokens.title_bar_height;
-    state.sidebar_width = tokens.sidebar_width;
+    state.tab_bar_height = tokens.tab_bar_height;
     gui_theme_apply( state );
 }
 
@@ -81,7 +83,7 @@ void gui_theme_apply( gui_app_state& state )
     style.TabRounding = rounding;
     style.WindowPadding = ImVec2( tokens.card_padding , tokens.card_padding );
     style.ItemSpacing = ImVec2( 8.0f , state.config.compact_mode ? 5.0f : 6.0f );
-    style.FramePadding = ImVec2( 8.0f , state.config.compact_mode ? 4.0f : 5.0f );
+    style.FramePadding = ImVec2( 10.0f , state.config.compact_mode ? 5.0f : 6.0f );
     style.WindowBorderSize = 0.0f;
     style.ChildBorderSize = 0.0f;
     style.ScrollbarSize = 0.0f;

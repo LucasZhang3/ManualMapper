@@ -17,11 +17,20 @@
 namespace
 {
     using set_window_display_affinity_fn = BOOL ( WINAPI* )( HWND , DWORD );
+    using get_window_display_affinity_fn = BOOL ( WINAPI* )( HWND , DWORD* );
 
     set_window_display_affinity_fn resolve_set_window_display_affinity( )
     {
         static const auto function = reinterpret_cast< set_window_display_affinity_fn >(
             GetProcAddress( GetModuleHandleW( L"user32.dll" ) , "SetWindowDisplayAffinity" ) );
+
+        return function;
+    }
+
+    get_window_display_affinity_fn resolve_get_window_display_affinity( )
+    {
+        static const auto function = reinterpret_cast< get_window_display_affinity_fn >(
+            GetProcAddress( GetModuleHandleW( L"user32.dll" ) , "GetWindowDisplayAffinity" ) );
 
         return function;
     }
@@ -44,6 +53,7 @@ namespace
 
         if ( set_affinity( hwnd , affinity ) )
         {
+            RedrawWindow( hwnd , nullptr , nullptr , RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME );
             return true;
         }
 
@@ -109,4 +119,45 @@ bool apply_capture_stealth( void* hwnd , bool enabled , std::wstring* error_out 
     }
 
     return false;
+}
+
+bool capture_stealth_active( void* hwnd )
+{
+    if ( !hwnd )
+    {
+        return false;
+    }
+
+    const auto get_affinity = resolve_get_window_display_affinity( );
+
+    if ( !get_affinity )
+    {
+        return false;
+    }
+
+    DWORD affinity = WDA_NONE;
+
+    if ( !get_affinity( static_cast< HWND >( hwnd ) , &affinity ) )
+    {
+        return false;
+    }
+
+    return affinity != WDA_NONE;
+}
+
+void sync_capture_stealth( void* hwnd , bool enabled )
+{
+    if ( !hwnd || !capture_stealth_supported( ) )
+    {
+        return;
+    }
+
+    const bool os_active = capture_stealth_active( hwnd );
+
+    if ( enabled == os_active )
+    {
+        return;
+    }
+
+    apply_capture_stealth( hwnd , enabled , nullptr );
 }

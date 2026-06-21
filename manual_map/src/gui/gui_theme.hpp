@@ -11,10 +11,12 @@ struct gui_theme_tokens
     float label_size = 13.0f;
     float mono_size = 14.0f;
     float title_bar_height = 36.0f;
-    float sidebar_width = 180.0f;
+    float tab_bar_height = 36.0f;
     float status_bar_height = 26.0f;
     float row_height = 38.0f;
+    float shell_padding = 16.0f;
     float card_padding = 12.0f;
+    float card_inner_padding = 14.0f;
     float section_spacing = 10.0f;
 };
 
