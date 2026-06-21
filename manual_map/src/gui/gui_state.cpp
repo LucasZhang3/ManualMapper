@@ -131,13 +131,14 @@ namespace
         }
 
         ImGuiStyle& style = ImGui::GetStyle( );
-        style.WindowRounding = 0.0f;
-        style.ChildRounding = 0.0f;
-        style.FrameRounding = 0.0f;
-        style.PopupRounding = 0.0f;
-        style.ScrollbarRounding = 0.0f;
-        style.GrabRounding = 0.0f;
-        style.TabRounding = 0.0f;
+        const float rounding = 6.0f;
+        style.WindowRounding = rounding;
+        style.ChildRounding = rounding;
+        style.FrameRounding = rounding;
+        style.PopupRounding = rounding;
+        style.ScrollbarRounding = rounding;
+        style.GrabRounding = rounding;
+        style.TabRounding = rounding;
         style.WindowPadding = ImVec2( 12.0f , 12.0f );
         style.ItemSpacing = ImVec2( 8.0f , 6.0f );
         style.FramePadding = ImVec2( 8.0f , 5.0f );
@@ -344,7 +345,6 @@ namespace
                 {
                     state.list_focus = row;
                     state.selected_pid = static_cast< int >( process.pid );
-                    std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
                 }
 
                 if ( right_clicked )
@@ -354,8 +354,8 @@ namespace
 
                 if ( double_clicked )
                 {
+                    state.list_focus = row;
                     state.selected_pid = static_cast< int >( process.pid );
-                    std::strncpy( state.search , name_utf8.c_str( ) , sizeof( state.search ) - 1 );
                     start_injection( state );
                 }
 
@@ -379,7 +379,6 @@ namespace
             {
                 const auto& focused_process = visible [ static_cast< size_t >( state.list_focus ) ];
                 state.selected_pid = static_cast< int >( focused_process.pid );
-                std::strncpy( state.search , wide_to_utf8( focused_process.name ).c_str( ) , sizeof( state.search ) - 1 );
 
                 if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
                 {
@@ -412,13 +411,40 @@ namespace
 
     int search_input_callback( ImGuiInputTextCallbackData* data )
     {
-        if ( data->EventFlag == ImGuiInputTextFlags_CallbackEdit && g_state )
+        ( void )data;
+        return 0;
+    }
+
+    std::string selected_process_label( const gui_app_state& state )
+    {
+        if ( state.selected_pid <= 0 )
         {
-            g_state->selected_pid = 0;
-            g_state->list_focus = -1;
+            return {};
         }
 
-        return 0;
+        for ( const auto& process : state.all_processes )
+        {
+            if ( static_cast< int >( process.pid ) == state.selected_pid )
+            {
+                return wide_to_utf8( process.name ) + " (PID " + std::to_string( process.pid ) + ")";
+            }
+        }
+
+        return "PID " + std::to_string( state.selected_pid );
+    }
+
+    void draw_help_marker( const char* description )
+    {
+        ImGui::SameLine( );
+        ImGui::TextDisabled( "(?)" );
+
+        if ( ImGui::BeginItemTooltip( ) )
+        {
+            ImGui::PushTextWrapPos( ImGui::GetFontSize( ) * 32.0f );
+            ImGui::TextUnformatted( description );
+            ImGui::PopTextWrapPos( );
+            ImGui::EndTooltip( );
+        }
     }
 
     struct inject_worker_context
@@ -678,6 +704,7 @@ namespace
         ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
         ImGui::AlignTextToFramePadding( );
         ImGui::TextUnformatted( state.light_mode ? "Light" : "Dark" );
+        draw_help_marker( "Switch between light and dark interface themes." );
     }
 
     bool set_stealth_capture( gui_app_state& state , bool enabled )
@@ -728,18 +755,6 @@ namespace
             set_stealth_capture( state , !state.stealth_capture );
         }
 
-        if ( !supported && ImGui::IsItemHovered( ) )
-        {
-            ImGui::SetTooltip( "Capture stealth requires Windows 10 version 2004 or later." );
-        }
-        else if ( ImGui::IsItemHovered( ) )
-        {
-            ImGui::SetTooltip(
-                state.stealth_capture
-                    ? "Stealth ON: window is hidden from Discord, OBS, and similar capture tools."
-                    : "Stealth OFF: window appears in Discord, OBS, and similar capture tools." );
-        }
-
         ImDrawList* draw = ImGui::GetWindowDrawList( );
         const ImU32 track = ImGui::GetColorU32(
             state.stealth_capture ? ImVec4( 0.45f , 0.20f , 0.75f , 1.0f ) : ImVec4( 0.22f , 0.24f , 0.30f , 1.0f ) );
@@ -751,6 +766,12 @@ namespace
         ImGui::SameLine( 0.0f , style.ItemInnerSpacing.x );
         ImGui::AlignTextToFramePadding( );
         ImGui::TextUnformatted( state.stealth_capture ? "Stealth" : "Visible" );
+        draw_help_marker(
+            "Capture visibility for Discord, OBS, and similar tools.\n\n"
+            "Stealth ON uses SetWindowDisplayAffinity so the window stays visible on your monitor "
+            "but is excluded from most screen capture.\n\n"
+            "Run the injector as Administrator for best results with protected targets and capture APIs. "
+            "Requires Windows 10 version 2004 or later." );
 
         if ( !supported )
         {
@@ -886,113 +907,368 @@ namespace
         }
     }
 
-    void draw_settings_panel( gui_app_state& state )
+    void draw_settings_tab( gui_app_state& state )
     {
-        if ( ImGui::CollapsingHeader( "Settings & Safety" ) )
+        ImGui::BeginChild( "SettingsScroll" , ImVec2( 0.0f , 0.0f ) , ImGuiChildFlags_Border );
+
+        ImGui::TextUnformatted( "Appearance" );
+        ImGui::Separator( );
+        draw_theme_toggle( state );
+        ImGui::Spacing( );
+
+        ImGui::TextUnformatted( "Capture" );
+        ImGui::Separator( );
+        draw_stealth_toggle( state );
+        ImGui::Spacing( );
+
+        ImGui::TextUnformatted( "Injection" );
+        ImGui::Separator( );
+
+        if ( ImGui::Checkbox( "Confirm before inject" , &state.confirm_inject ) )
         {
-            ImGui::Checkbox( "Confirm before inject" , &state.confirm_inject );
-            ImGui::Checkbox( "Log timestamps" , &state.log_timestamps );
-
-            if ( ImGui::Checkbox( "Stealth (hide from Discord/OBS capture)" , &state.stealth_capture ) )
-            {
-                if ( !set_stealth_capture( state , state.stealth_capture ) )
-                {
-                    state.stealth_capture = !state.stealth_capture;
-                }
-            }
-
-            if ( ImGui::IsItemHovered( ) )
-            {
-                ImGui::SetTooltip( "Uses SetWindowDisplayAffinity so the window stays visible to you but not in screen capture." );
-            }
-
-            ImGui::Checkbox( "Allowlist mode (off = blocklist)" , &state.use_allowlist );
             state.config.confirm_inject = state.confirm_inject;
+            save_config( state.config );
+        }
+
+        draw_help_marker( "Shows a confirmation dialog before starting manual map injection." );
+
+        ImGui::Checkbox( "Wait up to 30 seconds for process" , &state.wait_for_process );
+        draw_help_marker( "When injecting by process name, keeps polling for up to 30 seconds until the process appears." );
+
+        ImGui::Checkbox( "Inject all matching instances" , &state.inject_all );
+        draw_help_marker( "Injects into every running process that matches the target name instead of only the first match." );
+
+        ImGui::Checkbox( "Auto-inject when process appears" , &state.auto_inject );
+        draw_help_marker( "Automatically injects once when a process matching the current search name starts." );
+
+        ImGui::SetNextItemWidth( 120.0f );
+        ImGui::InputInt( "Delay before inject (seconds)" , &state.inject_delay_sec );
+        state.inject_delay_sec = ( std::max )( 0 , state.inject_delay_sec );
+        draw_help_marker( "Waits the specified number of seconds after you click Inject before the payload is mapped." );
+
+        ImGui::Spacing( );
+        ImGui::TextUnformatted( "Logging" );
+        ImGui::Separator( );
+
+        if ( ImGui::Checkbox( "Log timestamps" , &state.log_timestamps ) )
+        {
             state.config.log_timestamps = state.log_timestamps;
+            save_config( state.config );
+        }
+
+        draw_help_marker( "Prefixes each log line with the local time it was written." );
+
+        ImGui::Spacing( );
+        ImGui::TextUnformatted( "Safety" );
+        ImGui::Separator( );
+
+        if ( ImGui::Checkbox( "Allowlist mode (off = blocklist)" , &state.use_allowlist ) )
+        {
             state.config.use_allowlist = state.use_allowlist;
+            save_config( state.config );
+        }
 
-            ImGui::InputTextMultiline(
-                "Process rules (one per line)" ,
-                state.process_rules_text ,
-                sizeof( state.process_rules_text ) ,
-                ImVec2( -1.0f , 54.0f ) );
+        draw_help_marker(
+            "Process rules below are treated as an allowlist when enabled, or a blocklist when disabled. "
+            "Injection is blocked when the target process name matches a blocklist entry, "
+            "or when allowlist mode is on and the process is not listed." );
 
-            if ( ImGui::IsItemDeactivatedAfterEdit( ) )
+        ImGui::InputTextMultiline(
+            "Process rules (one per line)" ,
+            state.process_rules_text ,
+            sizeof( state.process_rules_text ) ,
+            ImVec2( -1.0f , 72.0f ) );
+
+        if ( ImGui::IsItemDeactivatedAfterEdit( ) )
+        {
+            sync_process_rules( state );
+            save_config( state.config );
+        }
+
+        draw_help_marker( "Process executable names such as notepad.exe. One entry per line." );
+
+        ImGui::Spacing( );
+        ImGui::TextUnformatted( "Advanced" );
+        ImGui::Separator( );
+
+        ImGui::InputText( "CLI notes (logged on inject)" , state.cli_notes , sizeof( state.cli_notes ) );
+
+        if ( ImGui::IsItemDeactivatedAfterEdit( ) )
+        {
+            state.config.cli_notes = utf8_to_wide( state.cli_notes );
+            save_config( state.config );
+        }
+
+        draw_help_marker( "Optional free-form note appended to the log whenever an injection starts." );
+
+        if ( ImGui::Button( "Export Settings" , ImVec2( 140.0f , 0.0f ) ) )
+        {
+            wchar_t path [ MAX_PATH ] = L"manual_map_settings.ini";
+            OPENFILENAMEW dialog {};
+            dialog.lStructSize = sizeof( dialog );
+            dialog.hwndOwner = static_cast< HWND >( g_gui_hwnd );
+            dialog.lpstrFilter = L"INI Files (*.ini)\0*.ini\0All Files (*.*)\0*.*\0";
+            dialog.lpstrFile = path;
+            dialog.nMaxFile = MAX_PATH;
+            dialog.Flags = OFN_OVERWRITEPROMPT;
+            dialog.lpstrDefExt = L"ini";
+
+            if ( GetSaveFileNameW( &dialog ) )
             {
                 sync_process_rules( state );
-                save_config( state.config );
+                save_config_to_path( path , state.config );
+                append_log( state , "Settings exported." );
             }
+        }
 
-            ImGui::InputText( "CLI notes (logged on inject)" , state.cli_notes , sizeof( state.cli_notes ) );
+        ImGui::SameLine( );
 
-            if ( ImGui::IsItemDeactivatedAfterEdit( ) )
+        if ( ImGui::Button( "Import Settings" , ImVec2( 140.0f , 0.0f ) ) )
+        {
+            wchar_t path [ MAX_PATH ] = {};
+            OPENFILENAMEW dialog {};
+            dialog.lStructSize = sizeof( dialog );
+            dialog.hwndOwner = static_cast< HWND >( g_gui_hwnd );
+            dialog.lpstrFilter = L"INI Files (*.ini)\0*.ini\0All Files (*.*)\0*.*\0";
+            dialog.lpstrFile = path;
+            dialog.nMaxFile = MAX_PATH;
+            dialog.Flags = OFN_FILEMUSTEXIST;
+
+            if ( GetOpenFileNameW( &dialog ) )
             {
-                state.config.cli_notes = utf8_to_wide( state.cli_notes );
-                save_config( state.config );
-            }
-
-            if ( ImGui::Button( "Export Settings" ) )
-            {
-                wchar_t path [ MAX_PATH ] = L"manual_map_settings.ini";
-                OPENFILENAMEW dialog {};
-                dialog.lStructSize = sizeof( dialog );
-                dialog.hwndOwner = static_cast< HWND >( g_gui_hwnd );
-                dialog.lpstrFilter = L"INI Files (*.ini)\0*.ini\0All Files (*.*)\0*.*\0";
-                dialog.lpstrFile = path;
-                dialog.nMaxFile = MAX_PATH;
-                dialog.Flags = OFN_OVERWRITEPROMPT;
-                dialog.lpstrDefExt = L"ini";
-
-                if ( GetSaveFileNameW( &dialog ) )
+                if ( load_config_from_path( path , state.config ) )
                 {
-                    sync_process_rules( state );
-                    save_config_to_path( path , state.config );
-                    append_log( state , "Settings exported." );
-                }
-            }
+                    state.confirm_inject = state.config.confirm_inject;
+                    state.log_timestamps = state.config.log_timestamps;
+                    state.use_allowlist = state.config.use_allowlist;
+                    state.stealth_capture = state.config.stealth_capture;
+                    state.panel_split = state.config.panel_split;
+                    std::strncpy( state.cli_notes , wide_to_utf8( state.config.cli_notes ).c_str( ) , sizeof( state.cli_notes ) - 1 );
 
-            ImGui::SameLine( );
+                    std::wstring rules;
 
-            if ( ImGui::Button( "Import Settings" ) )
-            {
-                wchar_t path [ MAX_PATH ] = {};
-                OPENFILENAMEW dialog {};
-                dialog.lStructSize = sizeof( dialog );
-                dialog.hwndOwner = static_cast< HWND >( g_gui_hwnd );
-                dialog.lpstrFilter = L"INI Files (*.ini)\0*.ini\0All Files (*.*)\0*.*\0";
-                dialog.lpstrFile = path;
-                dialog.nMaxFile = MAX_PATH;
-                dialog.Flags = OFN_FILEMUSTEXIST;
-
-                if ( GetOpenFileNameW( &dialog ) )
-                {
-                    if ( load_config_from_path( path , state.config ) )
+                    for ( const auto& rule : state.config.process_rules )
                     {
-                        state.confirm_inject = state.config.confirm_inject;
-                        state.log_timestamps = state.config.log_timestamps;
-                        state.use_allowlist = state.config.use_allowlist;
-                        state.panel_split = state.config.panel_split;
-                        std::strncpy( state.cli_notes , wide_to_utf8( state.config.cli_notes ).c_str( ) , sizeof( state.cli_notes ) - 1 );
-
-                        std::wstring rules;
-
-                        for ( const auto& rule : state.config.process_rules )
+                        if ( !rules.empty( ) )
                         {
-                            if ( !rules.empty( ) )
-                            {
-                                rules += L"\n";
-                            }
-
-                            rules += rule;
+                            rules += L"\n";
                         }
 
-                        std::strncpy( state.process_rules_text , wide_to_utf8( rules ).c_str( ) , sizeof( state.process_rules_text ) - 1 );
-                        save_config( state.config );
-                        append_log( state , "Settings imported." );
+                        rules += rule;
                     }
+
+                    std::strncpy( state.process_rules_text , wide_to_utf8( rules ).c_str( ) , sizeof( state.process_rules_text ) - 1 );
+                    save_config( state.config );
+                    apply_theme( state.light_mode );
+
+                    if ( state.stealth_capture )
+                    {
+                        set_stealth_capture( state , true );
+                    }
+                    else
+                    {
+                        set_stealth_capture( state , false );
+                    }
+
+                    append_log( state , "Settings imported." );
                 }
             }
         }
+
+        draw_help_marker( "Export or import the injector settings file from %AppData%\\manual_map\\settings.ini." );
+
+        ImGui::EndChild( );
+    }
+
+    bool export_log( gui_app_state& state );
+
+    void draw_injection_tab( gui_app_state& state , ImGuiIO& io )
+    {
+        const float left_width = io.DisplaySize.x * state.panel_split;
+
+        ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , 0 ) , ImGuiChildFlags_Border );
+        ImGui::TextUnformatted( "Target Process" );
+        draw_help_marker( "Type in the search box to filter the list. Clicking a row selects it without changing the filter." );
+        ImGui::SetNextItemWidth( -240.0f );
+        ImGui::InputTextWithHint(
+            "##search" ,
+            "Search by name or PID..." ,
+            state.search ,
+            sizeof( state.search ) ,
+            ImGuiInputTextFlags_CallbackEdit ,
+            search_input_callback );
+
+        ImGui::SameLine( );
+        const char* sort_labels [ ] = { "Name" , "PID" , "Session" };
+        int sort_index = static_cast< int >( state.sort_mode );
+        ImGui::SetNextItemWidth( 90.0f );
+
+        if ( ImGui::Combo( "##sort" , &sort_index , sort_labels , IM_ARRAYSIZE( sort_labels ) ) )
+        {
+            state.sort_mode = static_cast< process_sort_mode >( sort_index );
+        }
+
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Refresh" , ImVec2( -1.0f , 0.0f ) ) )
+        {
+            refresh_processes( state );
+        }
+
+        const auto visible = visible_processes( state );
+        ImGui::TextDisabled( "%d process(es) shown" , static_cast< int >( visible.size( ) ) );
+        draw_process_list( state , visible , io.DisplaySize.y * 0.32f );
+
+        if ( state.selected_pid > 0 )
+        {
+            ImGui::TextDisabled( "Selected: %s" , selected_process_label( state ).c_str( ) );
+        }
+        else if ( state.search [ 0 ] )
+        {
+            ImGui::TextDisabled( "Inject by name: %s" , state.search );
+        }
+
+        ImGui::Spacing( );
+        ImGui::Separator( );
+        ImGui::TextUnformatted( "DLL Payload" );
+        draw_recent_dll_cards( state );
+
+        ImGui::SetNextItemWidth( -90.0f );
+        ImGui::InputText( "##dll_path" , state.dll_path , sizeof( state.dll_path ) );
+
+        if ( ImGui::IsItemDeactivatedAfterEdit( ) )
+        {
+            refresh_dll_pe( state );
+        }
+
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Browse" , ImVec2( -1.0f , 0.0f ) ) )
+        {
+            const auto selected = pick_dll_path( utf8_to_wide( state.dll_path ) );
+
+            if ( !selected.empty( ) )
+            {
+                std::strncpy( state.dll_path , wide_to_utf8( selected ).c_str( ) , sizeof( state.dll_path ) - 1 );
+                refresh_dll_pe( state );
+            }
+        }
+
+        draw_pe_preview( state );
+        ImGui::EndChild( );
+
+        ImGui::SameLine( );
+        ImGui::InvisibleButton( "##splitter" , ImVec2( 4.0f , -1.0f ) );
+
+        if ( ImGui::IsItemActive( ) )
+        {
+            state.panel_split = ( std::clamp )( state.panel_split + io.MouseDelta.x / io.DisplaySize.x , 0.28f , 0.62f );
+            state.config.panel_split = state.panel_split;
+        }
+
+        if ( ImGui::IsItemHovered( ) || ImGui::IsItemActive( ) )
+        {
+            ImGui::SetMouseCursor( ImGuiMouseCursor_ResizeEW );
+        }
+
+        ImGui::SameLine( );
+        ImGui::BeginChild( "RightPanel" , ImVec2( 0.0f , 0.0f ) , ImGuiChildFlags_Border );
+        ImGui::TextUnformatted( "Output Log" );
+        ImGui::SetNextItemWidth( 160.0f );
+        ImGui::InputTextWithHint( "##logfilter" , "Filter tags..." , state.log_filter , sizeof( state.log_filter ) );
+        draw_help_marker( "Shows only log lines containing the entered text, such as [inject] or failed." );
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Copy Log" ) )
+        {
+            std::string text;
+            {
+                std::lock_guard lock( state.log_mutex );
+                text = state.log;
+            }
+
+            if ( copy_text_to_clipboard( text ) )
+            {
+                append_log( state , "Log copied to clipboard." );
+            }
+        }
+
+        std::string log_copy;
+        {
+            std::lock_guard lock( state.log_mutex );
+            log_copy = state.log;
+        }
+
+        ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , -48.0f ) , ImGuiChildFlags_Border );
+        std::istringstream stream( log_copy );
+        std::string line;
+
+        while ( std::getline( stream , line ) )
+        {
+            if ( state.log_filter [ 0 ] && line.find( state.log_filter ) == std::string::npos )
+            {
+                continue;
+            }
+
+            ImGui::PushStyleColor( ImGuiCol_Text , log_color_for_line( line , state.light_mode ) );
+            ImGui::TextWrapped( "%s" , line.c_str( ) );
+            ImGui::PopStyleColor( );
+        }
+
+        if ( ImGui::GetScrollY( ) >= ImGui::GetScrollMaxY( ) )
+        {
+            ImGui::SetScrollHereY( 1.0f );
+        }
+
+        ImGui::EndChild( );
+
+        const bool busy = state.injecting.load( );
+
+        if ( busy )
+        {
+            ImGui::BeginDisabled( );
+        }
+
+        if ( ImGui::Button( "Inject" , ImVec2( 120.0f , 36.0f ) ) )
+        {
+            start_injection( state );
+        }
+
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Run as Admin" , ImVec2( 120.0f , 36.0f ) ) )
+        {
+            if ( relaunch_as_admin( L"--gui" ) )
+            {
+                PostMessageW( static_cast< HWND >( g_gui_hwnd ) , WM_CLOSE , 0 , 0 );
+            }
+            else
+            {
+                append_log( state , "Failed to relaunch as administrator." );
+            }
+        }
+
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Clear Log" , ImVec2( 100.0f , 36.0f ) ) )
+        {
+            std::lock_guard lock( state.log_mutex );
+            state.log.clear( );
+        }
+
+        ImGui::SameLine( );
+
+        if ( ImGui::Button( "Export Log" , ImVec2( 100.0f , 36.0f ) ) )
+        {
+            export_log( state );
+        }
+
+        if ( busy )
+        {
+            ImGui::EndDisabled( );
+        }
+
+        ImGui::EndChild( );
     }
 
     bool export_log( gui_app_state& state )
@@ -1206,11 +1482,6 @@ void gui_state_render( gui_app_state& state )
         }
     }
 
-    ImGui::SameLine( io.DisplaySize.x - 270.0f );
-    draw_stealth_toggle( state );
-    ImGui::SameLine( io.DisplaySize.x - 130.0f );
-    draw_theme_toggle( state );
-
     if ( state.injecting.load( ) )
     {
         ImGui::ProgressBar( state.inject_progress , ImVec2( -1.0f , 0.0f ) );
@@ -1218,199 +1489,23 @@ void gui_state_render( gui_app_state& state )
 
     ImGui::Separator( );
 
-    const float left_width = io.DisplaySize.x * state.panel_split;
-
-    ImGui::BeginChild( "LeftPanel" , ImVec2( left_width , 0 ) , ImGuiChildFlags_Border );
-    ImGui::TextUnformatted( "Target Process" );
-    ImGui::SetNextItemWidth( -240.0f );
-    ImGui::InputTextWithHint(
-        "##search" ,
-        "Search by name or PID..." ,
-        state.search ,
-        sizeof( state.search ) ,
-        ImGuiInputTextFlags_CallbackEdit ,
-        search_input_callback );
-
-    ImGui::SameLine( );
-    const char* sort_labels [ ] = { "Name" , "PID" , "Session" };
-    int sort_index = static_cast< int >( state.sort_mode );
-    ImGui::SetNextItemWidth( 90.0f );
-
-    if ( ImGui::Combo( "##sort" , &sort_index , sort_labels , IM_ARRAYSIZE( sort_labels ) ) )
+    if ( ImGui::BeginTabBar( "MainTabs" , ImGuiTabBarFlags_None ) )
     {
-        state.sort_mode = static_cast< process_sort_mode >( sort_index );
-    }
-
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Refresh" , ImVec2( -1.0f , 0.0f ) ) )
-    {
-        refresh_processes( state );
-    }
-
-    const auto visible = visible_processes( state );
-    ImGui::TextDisabled( "%d process(es) shown" , static_cast< int >( visible.size( ) ) );
-    draw_process_list( state , visible , io.DisplaySize.y * 0.30f );
-
-    if ( state.selected_pid > 0 )
-    {
-        ImGui::TextDisabled( "Selected PID: %d (right-click row for favorites)" , state.selected_pid );
-    }
-    else if ( state.search [ 0 ] )
-    {
-        ImGui::TextDisabled( "Inject by name: %s" , state.search );
-    }
-
-    ImGui::Checkbox( "Wait up to 30 seconds for process" , &state.wait_for_process );
-    ImGui::SameLine( );
-    ImGui::Checkbox( "Inject all instances" , &state.inject_all );
-    ImGui::Checkbox( "Auto-inject when process appears" , &state.auto_inject );
-    ImGui::SameLine( );
-    ImGui::SetNextItemWidth( 80.0f );
-    ImGui::InputInt( "Delay (s)" , &state.inject_delay_sec );
-    state.inject_delay_sec = ( std::max )( 0 , state.inject_delay_sec );
-
-    ImGui::Spacing( );
-    ImGui::Separator( );
-    ImGui::TextUnformatted( "DLL Payload" );
-    draw_recent_dll_cards( state );
-
-    ImGui::SetNextItemWidth( -90.0f );
-    ImGui::InputText( "##dll_path" , state.dll_path , sizeof( state.dll_path ) );
-
-    if ( ImGui::IsItemDeactivatedAfterEdit( ) )
-    {
-        refresh_dll_pe( state );
-    }
-
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Browse" , ImVec2( -1.0f , 0.0f ) ) )
-    {
-        const auto selected = pick_dll_path( utf8_to_wide( state.dll_path ) );
-
-        if ( !selected.empty( ) )
+        if ( ImGui::BeginTabItem( "Injection" ) )
         {
-            std::strncpy( state.dll_path , wide_to_utf8( selected ).c_str( ) , sizeof( state.dll_path ) - 1 );
-            refresh_dll_pe( state );
-        }
-    }
-
-    draw_pe_preview( state );
-    draw_settings_panel( state );
-    ImGui::EndChild( );
-
-    ImGui::SameLine( );
-    ImGui::InvisibleButton( "##splitter" , ImVec2( 4.0f , -1.0f ) );
-
-    if ( ImGui::IsItemActive( ) )
-    {
-        state.panel_split = ( std::clamp )( state.panel_split + io.MouseDelta.x / io.DisplaySize.x , 0.28f , 0.62f );
-        state.config.panel_split = state.panel_split;
-    }
-
-    if ( ImGui::IsItemHovered( ) || ImGui::IsItemActive( ) )
-    {
-        ImGui::SetMouseCursor( ImGuiMouseCursor_ResizeEW );
-    }
-
-    ImGui::SameLine( );
-    ImGui::BeginChild( "RightPanel" , ImVec2( 0.0f , 0.0f ) , ImGuiChildFlags_Border );
-    ImGui::TextUnformatted( "Output Log" );
-    ImGui::SetNextItemWidth( 160.0f );
-    ImGui::InputTextWithHint( "##logfilter" , "Filter tags..." , state.log_filter , sizeof( state.log_filter ) );
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Copy Log" ) )
-    {
-        std::string text;
-        {
-            std::lock_guard lock( state.log_mutex );
-            text = state.log;
+            draw_injection_tab( state , io );
+            ImGui::EndTabItem( );
         }
 
-        if ( copy_text_to_clipboard( text ) )
+        if ( ImGui::BeginTabItem( "Settings" ) )
         {
-            append_log( state , "Log copied to clipboard." );
-        }
-    }
-
-    std::string log_copy;
-    {
-        std::lock_guard lock( state.log_mutex );
-        log_copy = state.log;
-    }
-
-    ImGui::BeginChild( "LogScroll" , ImVec2( -1.0f , -48.0f ) , ImGuiChildFlags_Border );
-    std::istringstream stream( log_copy );
-    std::string line;
-
-    while ( std::getline( stream , line ) )
-    {
-        if ( state.log_filter [ 0 ] && line.find( state.log_filter ) == std::string::npos )
-        {
-            continue;
+            draw_settings_tab( state );
+            ImGui::EndTabItem( );
         }
 
-        ImGui::PushStyleColor( ImGuiCol_Text , log_color_for_line( line , state.light_mode ) );
-        ImGui::TextWrapped( "%s" , line.c_str( ) );
-        ImGui::PopStyleColor( );
+        ImGui::EndTabBar( );
     }
 
-    if ( ImGui::GetScrollY( ) >= ImGui::GetScrollMaxY( ) )
-    {
-        ImGui::SetScrollHereY( 1.0f );
-    }
-
-    ImGui::EndChild( );
-
-    const bool busy = state.injecting.load( );
-
-    if ( busy )
-    {
-        ImGui::BeginDisabled( );
-    }
-
-    if ( ImGui::Button( "Inject" , ImVec2( 120.0f , 36.0f ) ) )
-    {
-        start_injection( state );
-    }
-
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Run as Admin" , ImVec2( 120.0f , 36.0f ) ) )
-    {
-        if ( relaunch_as_admin( L"--gui" ) )
-        {
-            PostMessageW( static_cast< HWND >( g_gui_hwnd ) , WM_CLOSE , 0 , 0 );
-        }
-        else
-        {
-            append_log( state , "Failed to relaunch as administrator." );
-        }
-    }
-
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Clear Log" , ImVec2( 100.0f , 36.0f ) ) )
-    {
-        std::lock_guard lock( state.log_mutex );
-        state.log.clear( );
-    }
-
-    ImGui::SameLine( );
-
-    if ( ImGui::Button( "Export Log" , ImVec2( 100.0f , 36.0f ) ) )
-    {
-        export_log( state );
-    }
-
-    if ( busy )
-    {
-        ImGui::EndDisabled( );
-    }
-
-    ImGui::EndChild( );
     draw_confirm_popup( state );
     ImGui::End( );
 }
