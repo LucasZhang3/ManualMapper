@@ -17,6 +17,9 @@
 
 ---
 
+> **Disclaimer:** This project is for educational and research purposes. Using third-party software in online games may violate Terms of Service and result in bans. Use at your own risk.
+
+
 ## What this project does
 
 Manual mapping loads a DLL into another process **without** calling `LoadLibrary` from the injector. Instead:
